@@ -1,3 +1,8 @@
 
 assets/brand/**
 assets/menu/**
+
+# Assets binarios reales del POS (NO versionar)
+waiter-app/assets/brand/**
+waiter-app/assets/menu/**
+kitchen-display/assets/brand/**
