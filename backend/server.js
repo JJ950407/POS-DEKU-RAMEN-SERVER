@@ -12,6 +12,8 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 const MENU_PATH = path.join(DATA_DIR, "menu.json");
 const ORDERS_PATH = path.join(DATA_DIR, "orders.json");
+const PROMO_PATH = path.join(DATA_DIR, "promo.json");
+const PROMO_TZ = "America/Mexico_City";
 const readyTimers = new Map();
 
 app.use(express.json({ limit: "1mb" }));
@@ -44,6 +46,23 @@ function loadMenu() {
 
 function loadOrders() {
   return safeReadJson(ORDERS_PATH, []);
+}
+
+function loadPromoState() {
+  const fallback = { manualOverrideEnabled: false, updatedAt: null };
+  const data = safeReadJson(PROMO_PATH, null);
+  if (!data || typeof data.manualOverrideEnabled !== "boolean") {
+    safeWriteJson(PROMO_PATH, fallback);
+    return fallback;
+  }
+  return {
+    manualOverrideEnabled: data.manualOverrideEnabled,
+    updatedAt: data.updatedAt || null
+  };
+}
+
+function savePromoState(state) {
+  safeWriteJson(PROMO_PATH, state);
 }
 
 function saveOrders(orders) {
@@ -173,9 +192,76 @@ function validateOrderPayload(payload) {
   return null;
 }
 
+function isThursdayNow(now = new Date()) {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: PROMO_TZ, weekday: "short" }).format(now);
+  return weekday === "Thu";
+}
+
+function buildPromoPayload(promoState, now = new Date()) {
+  const isThursday = isThursdayNow(now);
+  const manualOverrideEnabled = Boolean(promoState.manualOverrideEnabled);
+  const promoActive = isThursday || manualOverrideEnabled;
+  const promoSource = promoActive ? (isThursday ? "auto_thursday" : "manual_override") : null;
+  return {
+    isThursdayNow: isThursday,
+    manualOverrideEnabled,
+    promoActive,
+    promoSource,
+    tz: PROMO_TZ,
+    nowISO: now.toISOString(),
+    promoType: "2x1_jueves"
+  };
+}
+
+function calculatePromoDiscount(items) {
+  const menu = loadMenu();
+  const menuById = new Map(menu.products.map((product) => [product.id, product]));
+  const ramenUnitPrices = [];
+  items.forEach((item) => {
+    const product = menuById.get(item.productId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+    const qty = Number(item.qty);
+    const unitPrice = Number(item.unitPrice);
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice)) {
+      return;
+    }
+    for (let i = 0; i < qty; i += 1) {
+      ramenUnitPrices.push(unitPrice);
+    }
+  });
+  ramenUnitPrices.sort((a, b) => a - b);
+  let discount = 0;
+  for (let i = 0; i + 1 < ramenUnitPrices.length; i += 2) {
+    discount += ramenUnitPrices[i];
+  }
+  return discount;
+}
+
 app.get("/api/menu", (req, res) => {
   const menu = loadMenu();
   res.json(menu);
+});
+
+app.get("/api/promo", (req, res) => {
+  const promoState = loadPromoState();
+  const payload = buildPromoPayload(promoState);
+  res.json(payload);
+});
+
+app.post("/api/promo/override", (req, res) => {
+  const { enabled, confirmText } = req.body || {};
+  if (confirmText !== "ACTIVAR PROMO 2X1") {
+    return res.status(400).json({ error: "Confirmación inválida. Escribe ACTIVAR PROMO 2X1." });
+  }
+  const promoState = {
+    manualOverrideEnabled: Boolean(enabled),
+    updatedAt: new Date().toISOString()
+  };
+  savePromoState(promoState);
+  const payload = buildPromoPayload(promoState);
+  res.json(payload);
 });
 
 app.get("/api/orders", (req, res) => {
@@ -199,16 +285,39 @@ app.post("/api/orders", (req, res) => {
     return res.status(400).json({ error: "Mesa inválida." });
   }
 
+  const now = new Date();
+  const promoState = loadPromoState();
+  const promoPayload = buildPromoPayload(promoState, now);
+  let promoDiscount = 0;
+  if (promoPayload.promoActive) {
+    promoDiscount = calculatePromoDiscount(req.body.items);
+  }
+  if (!Number.isFinite(promoDiscount) || promoDiscount <= 0) {
+    promoDiscount = 0;
+  }
+  const totals = {
+    ...req.body.totals,
+    total: promoDiscount > 0
+      ? Math.max(0, req.body.totals.total - promoDiscount)
+      : req.body.totals.total
+  };
+  const promoApplied = promoDiscount > 0;
+
   const orders = loadOrders();
   const order = {
     id: generateOrderId(),
-    createdAt: new Date().toISOString(),
+    createdAt: now.toISOString(),
     status: "pending",
     table,
     items: req.body.items,
-    totals: req.body.totals,
+    totals,
     notes: req.body.notes || ""
   };
+  order.promoApplied = promoApplied;
+  order.promoType = "2x1_jueves";
+  order.promoSource = promoPayload.promoActive ? promoPayload.promoSource : null;
+  order.promoDiscount = promoDiscount;
+  order.promoTimestamp = now.toISOString();
   orders.push(order);
   saveOrders(orders);
   broadcast("order:new", order);
