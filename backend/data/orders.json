@@ -1,0 +1,428 @@
+[
+  {
+    "id": "ORD-1769734908550-C1ARMW",
+    "createdAt": "2026-01-30T01:01:48.550Z",
+    "status": "cancelled",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 135,
+        "meta": {
+          "size": "M",
+          "spicy": 1,
+          "extras": [
+            {
+              "productId": "extra_cerdo",
+              "name": "Extra Cerdo",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 135,
+      "total": 135
+    },
+    "notes": "",
+    "cancelledAt": "2026-01-30T01:02:14.197Z",
+    "cancelReason": "prueba"
+  },
+  {
+    "id": "ORD-1769735288205-Z12BL0",
+    "createdAt": "2026-01-30T01:08:08.205Z",
+    "status": "cancelled",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 150,
+        "meta": {
+          "size": "G",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_camarones",
+              "name": "Extra Camarones",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 150,
+      "total": 150
+    },
+    "notes": "",
+    "cancelledAt": "2026-01-30T01:42:12.727Z",
+    "cancelReason": "prueba"
+  },
+  {
+    "id": "ORD-1769735463170-LDPKOP",
+    "createdAt": "2026-01-30T01:11:03.170Z",
+    "status": "cancelled",
+    "table": "2",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 190,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_fideos",
+              "name": "Extra Fideos",
+              "qty": 5,
+              "unitPrice": 15
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 190,
+      "total": 190
+    },
+    "notes": "",
+    "cancelledAt": "2026-01-30T01:11:23.724Z",
+    "cancelReason": "prueba "
+  },
+  {
+    "id": "ORD-1769737278707-G7N8A2",
+    "createdAt": "2026-01-30T01:41:18.707Z",
+    "status": "cancelled",
+    "table": "3",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 145,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_fideos",
+              "name": "Extra Fideos",
+              "qty": 2,
+              "unitPrice": 15
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 145,
+      "total": 145
+    },
+    "notes": "",
+    "cancelledAt": "2026-01-30T01:42:19.405Z",
+    "cancelReason": "prueba "
+  },
+  {
+    "id": "ORD-1769737582656-YNM391",
+    "createdAt": "2026-01-30T01:46:22.656Z",
+    "status": "paid",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 130,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_huevo",
+              "name": "Extra Huevo",
+              "qty": 1,
+              "unitPrice": 15
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 130,
+      "total": 130
+    },
+    "notes": "",
+    "paidAt": "2026-01-30T01:47:02.459Z"
+  },
+  {
+    "id": "ORD-1769744242704-DXEY5S",
+    "createdAt": "2026-01-30T03:37:22.704Z",
+    "status": "paid",
+    "table": "2",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 150,
+        "meta": {
+          "size": "G",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_cerdo",
+              "name": "Extra Cerdo",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 150,
+      "total": 150
+    },
+    "notes": "",
+    "paidAt": "2026-01-30T03:37:55.310Z"
+  },
+  {
+    "id": "ORD-1769897619982-1IDQD9",
+    "createdAt": "2026-01-31T22:13:39.982Z",
+    "status": "paid",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 130,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_fideos",
+              "name": "Extra Fideos",
+              "qty": 1,
+              "unitPrice": 15
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 130,
+      "total": 130
+    },
+    "notes": "",
+    "paidAt": "2026-01-31T22:14:13.649Z"
+  },
+  {
+    "id": "ORD-1769907224197-5ZAUGF",
+    "createdAt": "2026-02-01T00:53:44.197Z",
+    "status": "paid",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 135,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_cerdo",
+              "name": "Extra Cerdo",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 135,
+      "total": 135
+    },
+    "notes": "",
+    "paidAt": "2026-02-01T00:54:25.351Z"
+  },
+  {
+    "id": "ORD-1770160739014-KO47GP",
+    "createdAt": "2026-02-03T23:18:59.014Z",
+    "status": "paid",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 150,
+        "meta": {
+          "size": "G",
+          "spicy": 3,
+          "extras": [
+            {
+              "productId": "extra_camarones",
+              "name": "Extra Camarones",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      },
+      {
+        "productId": "drink_coca",
+        "name": "Coca-Cola",
+        "qty": 1,
+        "unitPrice": 20,
+        "meta": {}
+      }
+    ],
+    "totals": {
+      "subtotal": 170,
+      "total": 170
+    },
+    "notes": "",
+    "paidAt": "2026-02-04T20:51:32.725Z"
+  },
+  {
+    "id": "ORD-1770177221613-SOZQPY",
+    "createdAt": "2026-02-04T03:53:41.613Z",
+    "status": "paid",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_deku",
+        "name": "Deku Ramen",
+        "qty": 1,
+        "unitPrice": 135,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_cerdo",
+              "name": "Extra Cerdo",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 135,
+      "total": 135
+    },
+    "notes": "",
+    "paidAt": "2026-02-04T03:54:19.059Z"
+  },
+  {
+    "id": "ORD-1770238237288-C9T1NC",
+    "createdAt": "2026-02-04T20:50:37.288Z",
+    "status": "paid",
+    "table": "1",
+    "items": [
+      {
+        "productId": "ramen_yasai",
+        "name": "Yasai Ramen",
+        "qty": 1,
+        "unitPrice": 105,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_cerdo",
+              "name": "Extra Cerdo",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      },
+      {
+        "productId": "ramen_ebi",
+        "name": "Ebi Tonkotsu",
+        "qty": 1,
+        "unitPrice": 120,
+        "meta": {
+          "size": "M",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_camarones",
+              "name": "Extra Camarones",
+              "qty": 1,
+              "unitPrice": 20
+            }
+          ]
+        }
+      },
+      {
+        "productId": "side_gyozas",
+        "name": "Gyozas (5 pzas)",
+        "qty": 1,
+        "unitPrice": 55,
+        "meta": {}
+      },
+      {
+        "productId": "drink_coca",
+        "name": "Coca-Cola",
+        "qty": 2,
+        "unitPrice": 20,
+        "meta": {}
+      }
+    ],
+    "totals": {
+      "subtotal": 320,
+      "total": 320
+    },
+    "notes": "",
+    "paidAt": "2026-02-04T20:51:34.244Z"
+  },
+  {
+    "id": "ORD-1770241599032-NVVN0C",
+    "createdAt": "2026-02-04T21:46:39.032Z",
+    "status": "pending",
+    "table": "4",
+    "items": [
+      {
+        "productId": "ramen_ebi",
+        "name": "Ebi Tonkotsu",
+        "qty": 1,
+        "unitPrice": 130,
+        "meta": {
+          "size": "G",
+          "spicy": 2,
+          "extras": [
+            {
+              "productId": "extra_fideos",
+              "name": "Extra Fideos",
+              "qty": 1,
+              "unitPrice": 15
+            }
+          ]
+        }
+      }
+    ],
+    "totals": {
+      "subtotal": 130,
+      "total": 130
+    },
+    "notes": ""
+  }
+]
