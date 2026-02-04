@@ -216,7 +216,7 @@ function buildPromoPayload(promoState, now = new Date()) {
 function calculatePromoDiscount(items) {
   const menu = loadMenu();
   const menuById = new Map(menu.products.map((product) => [product.id, product]));
-  const ramenUnitPrices = [];
+  const ramenBasePrices = [];
   items.forEach((item) => {
     const product = menuById.get(item.productId);
     if (!product || product.category !== "ramen") {
@@ -227,14 +227,26 @@ function calculatePromoDiscount(items) {
     if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice)) {
       return;
     }
+    const extrasTotal = Array.isArray(item.meta && item.meta.extras)
+      ? item.meta.extras.reduce((sum, extra) => {
+        const extraUnit = Number(extra.unitPrice);
+        const extraQty = Number(extra.qty);
+        if (!Number.isFinite(extraUnit) || !Number.isFinite(extraQty)) {
+          return sum;
+        }
+        return sum + extraUnit * extraQty;
+      }, 0)
+      : 0;
+    const basePrice = unitPrice - extrasTotal;
+    const safeBasePrice = Number.isFinite(basePrice) ? Math.max(0, basePrice) : 0;
     for (let i = 0; i < qty; i += 1) {
-      ramenUnitPrices.push(unitPrice);
+      ramenBasePrices.push(safeBasePrice);
     }
   });
-  ramenUnitPrices.sort((a, b) => a - b);
+  ramenBasePrices.sort((a, b) => a - b);
   let discount = 0;
-  for (let i = 0; i + 1 < ramenUnitPrices.length; i += 2) {
-    discount += ramenUnitPrices[i];
+  for (let i = 0; i + 1 < ramenBasePrices.length; i += 2) {
+    discount += ramenBasePrices[i];
   }
   return discount;
 }
@@ -251,10 +263,7 @@ app.get("/api/promo", (req, res) => {
 });
 
 app.post("/api/promo/override", (req, res) => {
-  const { enabled, confirmText } = req.body || {};
-  if (confirmText !== "ACTIVAR PROMO 2X1") {
-    return res.status(400).json({ error: "Confirmación inválida. Escribe ACTIVAR PROMO 2X1." });
-  }
+  const { enabled } = req.body || {};
   const promoState = {
     manualOverrideEnabled: Boolean(enabled),
     updatedAt: new Date().toISOString()

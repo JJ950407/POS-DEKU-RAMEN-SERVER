@@ -317,16 +317,11 @@ async function fetchPromoStatus() {
 async function togglePromoOverride() {
   if (!promoToggle) return;
   const nextEnabled = !(state.promo && state.promo.manualOverrideEnabled);
-  const confirmText = prompt("Escribe ACTIVAR PROMO 2X1 para confirmar");
-  if (confirmText !== "ACTIVAR PROMO 2X1") {
-    alert("Confirmación inválida. Escribe ACTIVAR PROMO 2X1.");
-    return;
-  }
   try {
     const response = await fetch(apiUrl("/api/promo/override"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: nextEnabled, confirmText })
+      body: JSON.stringify({ enabled: nextEnabled })
     });
     if (!response.ok) {
       const data = await response.json().catch(() => null);
@@ -740,6 +735,7 @@ function renderHistoryTicket(order) {
   const statusLabel = order.status.toUpperCase();
   const cancelled = order.status === "cancelled";
   const cancelReason = order.cancelReason ? `Motivo: ${order.cancelReason}` : "";
+  const promoLine = order.promoApplied ? "<div>PROMO 2x1 JUEVES APLICADA</div>" : "";
 
   historyTicket.innerHTML = `
     <strong>DEKU RAMEN</strong>
@@ -749,6 +745,7 @@ function renderHistoryTicket(order) {
     ${cancelled && cancelReason ? `<div>${cancelReason}</div>` : ""}
     <div>${headerLine}</div>
     <div>${lines}</div>
+    ${promoLine}
     <div><strong>TOTAL:</strong> ${formatPrice(total)}</div>
   `;
 
