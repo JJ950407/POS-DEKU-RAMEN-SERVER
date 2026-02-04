@@ -2,6 +2,7 @@ const state = {
   menu: [],
   activeCategory: "ramen",
   cart: [],
+  promo: null,
   wizard: {
     open: false,
     step: 0,
@@ -23,6 +24,8 @@ const cartItems = document.getElementById("cartItems");
 const subtotalEl = document.getElementById("subtotal");
 const totalEl = document.getElementById("total");
 const orderStatus = document.getElementById("orderStatus");
+const promoStatus = document.getElementById("promoStatus");
+const promoToggle = document.getElementById("promoToggle");
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -272,6 +275,66 @@ function renderCart() {
   const totals = calculateTotals();
   subtotalEl.textContent = formatPrice(totals.subtotal);
   totalEl.textContent = formatPrice(totals.total);
+}
+
+function renderPromoStatus() {
+  if (!promoStatus) return;
+  if (!state.promo) {
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+    if (promoToggle) {
+      promoToggle.textContent = "Activar override";
+    }
+    return;
+  }
+  if (state.promo.promoActive) {
+    const label = state.promo.promoSource === "auto_thursday"
+      ? "PROMO 2x1: ACTIVA (AUTO JUEVES)"
+      : "PROMO 2x1: ACTIVA (OVERRIDE)";
+    promoStatus.textContent = label;
+  } else {
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+  }
+  if (promoToggle) {
+    promoToggle.textContent = state.promo.manualOverrideEnabled ? "Desactivar override" : "Activar override";
+  }
+}
+
+async function fetchPromoStatus() {
+  if (!promoStatus) return;
+  try {
+    const response = await apiGet("/api/promo");
+    if (!response.ok) {
+      throw new Error("No se pudo cargar promo");
+    }
+    state.promo = await response.json();
+    renderPromoStatus();
+  } catch (error) {
+    console.error(error);
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+  }
+}
+
+async function togglePromoOverride() {
+  if (!promoToggle) return;
+  const nextEnabled = !(state.promo && state.promo.manualOverrideEnabled);
+  try {
+    const response = await fetch(apiUrl("/api/promo/override"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: nextEnabled })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      const message = data && data.error ? data.error : "No se pudo actualizar promo.";
+      alert(message);
+      return;
+    }
+    state.promo = await response.json();
+    renderPromoStatus();
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo actualizar promo.");
+  }
 }
 
 function removeCartItem(id) {
@@ -672,6 +735,7 @@ function renderHistoryTicket(order) {
   const statusLabel = order.status.toUpperCase();
   const cancelled = order.status === "cancelled";
   const cancelReason = order.cancelReason ? `Motivo: ${order.cancelReason}` : "";
+  const promoLine = order.promoApplied ? "<div>PROMO 2x1 JUEVES APLICADA</div>" : "";
 
   historyTicket.innerHTML = `
     <strong>DEKU RAMEN</strong>
@@ -681,6 +745,7 @@ function renderHistoryTicket(order) {
     ${cancelled && cancelReason ? `<div>${cancelReason}</div>` : ""}
     <div>${headerLine}</div>
     <div>${lines}</div>
+    ${promoLine}
     <div><strong>TOTAL:</strong> ${formatPrice(total)}</div>
   `;
 
@@ -788,6 +853,10 @@ if (historyTable) {
   historyTable.addEventListener("change", refreshHistoryView);
 }
 
+if (promoToggle) {
+  promoToggle.addEventListener("click", togglePromoOverride);
+}
+
 async function init() {
   try {
     const response = await apiGet("/api/menu");
@@ -800,6 +869,8 @@ async function init() {
     console.error(error);
     setStatus("No se pudo cargar menú.");
   }
+
+  fetchPromoStatus();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((error) => console.error(error));
