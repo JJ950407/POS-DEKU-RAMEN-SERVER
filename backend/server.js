@@ -316,7 +316,9 @@ app.post("/api/promo/override", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body || {};
-  if (username === "Aurora" && password === "pucca123") {
+  const normalizedUser = typeof username === "string" ? username.trim().toLowerCase() : "";
+  const normalizedPass = typeof password === "string" ? password.trim() : "";
+  if (normalizedUser === "aurora" && normalizedPass === "pucca123") {
     res.cookie(SESSION_COOKIE, SESSION_VALUE, { httpOnly: true, sameSite: "lax" });
     return res.json({ ok: true });
   }

@@ -1,12 +1,21 @@
 const form = document.getElementById("loginForm");
 const errorEl = document.getElementById("loginError");
+const kitchenButton = document.getElementById("kitchenButton");
+
+if (kitchenButton) {
+  kitchenButton.addEventListener("click", () => {
+    window.location.href = "/kitchen/";
+  });
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   errorEl.textContent = "";
 
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value;
+  const usernameRaw = document.getElementById("username").value;
+  const passwordRaw = document.getElementById("password").value;
+  const username = usernameRaw.trim().toLowerCase();
+  const password = passwordRaw.trim();
 
   try {
     const response = await fetch("/api/login", {
