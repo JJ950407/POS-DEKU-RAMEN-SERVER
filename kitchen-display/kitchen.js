@@ -165,10 +165,20 @@ function renderOrders() {
       items.appendChild(line);
     });
 
-    if (order.notes) {
+    const note = order.note || order.notes;
+    if (note) {
       const notes = document.createElement("div");
-      notes.className = "small";
-      notes.textContent = `Notas: ${order.notes}`;
+      notes.className = "order-note";
+
+      const badge = document.createElement("span");
+      badge.className = "note-badge";
+      badge.textContent = "NOTA";
+
+      const text = document.createElement("span");
+      text.className = "note-text";
+      text.textContent = note;
+
+      notes.append(badge, text);
       items.appendChild(notes);
     }
 
