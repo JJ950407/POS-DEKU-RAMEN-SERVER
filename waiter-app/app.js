@@ -28,6 +28,8 @@ const promoStatus = document.getElementById("promoStatus");
 const promoToggle = document.getElementById("promoToggle");
 const orderPrompt = document.getElementById("orderPrompt");
 const orderFlowButton = document.getElementById("orderFlowButton");
+const orderNextButton = document.getElementById("orderNextButton");
+const sendOrderButton = document.getElementById("sendOrder");
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -51,6 +53,7 @@ const historyTable = document.getElementById("historyTable");
 
 let historyOrders = [];
 let activeHistoryOrderId = null;
+let orderFlowStep = "idle";
 
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
@@ -598,6 +601,10 @@ function addRamenToCart() {
 }
 
 async function sendOrder() {
+  if (orderFlowStep !== "drinks") {
+    setStatus("Completa el flujo de orden antes de enviar.");
+    return;
+  }
   if (!tableSelect || !tableSelect.value) {
     setStatus("Selecciona mesa o Para llevar.");
     return;
@@ -901,19 +908,56 @@ if (promoToggle) {
   promoToggle.addEventListener("click", togglePromoOverride);
 }
 
+function updateOrderFlowUI() {
+  if (!sendOrderButton) return;
+  if (orderFlowStep === "idle") {
+    sendOrderButton.hidden = true;
+    if (orderNextButton) {
+      orderNextButton.hidden = true;
+    }
+    if (orderPrompt) {
+      orderPrompt.textContent = "";
+    }
+    return;
+  }
+  if (orderFlowStep === "sides") {
+    sendOrderButton.hidden = true;
+    if (orderNextButton) {
+      orderNextButton.hidden = false;
+    }
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean acompañamientos?";
+    }
+    return;
+  }
+  if (orderFlowStep === "drinks") {
+    sendOrderButton.hidden = false;
+    if (orderNextButton) {
+      orderNextButton.hidden = true;
+    }
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean bebidas?";
+    }
+  }
+}
+
 if (orderFlowButton) {
   orderFlowButton.addEventListener("click", () => {
-    if (orderPrompt) {
-      orderPrompt.textContent = "¿Desean bebidas o acompañamientos?";
-    }
+    orderFlowStep = "sides";
+    state.activeCategory = "sides";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
+  });
+}
+
+if (orderNextButton) {
+  orderNextButton.addEventListener("click", () => {
+    orderFlowStep = "drinks";
     state.activeCategory = "drinks";
     renderCategories();
     renderProducts();
-    setTimeout(() => {
-      state.activeCategory = "sides";
-      renderCategories();
-      renderProducts();
-    }, 700);
+    updateOrderFlowUI();
   });
 }
 
@@ -931,6 +975,7 @@ async function init() {
   }
 
   fetchPromoStatus();
+  updateOrderFlowUI();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((error) => console.error(error));
@@ -939,4 +984,6 @@ async function init() {
 
 init();
 
-document.getElementById("sendOrder").addEventListener("click", sendOrder);
+if (sendOrderButton) {
+  sendOrderButton.addEventListener("click", sendOrder);
+}
