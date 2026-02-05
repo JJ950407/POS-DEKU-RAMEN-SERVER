@@ -393,29 +393,52 @@ function removeCartItem(id) {
 
 function calculateTotals() {
   const subtotal = state.cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+  
   const promoActive = Boolean(state.promo && state.promo.promoActive);
   let promoDiscount = 0;
+  
   if (promoActive) {
-    const ramenBasePrices = state.cart
-      .filter((item) => {
-        if (item.type && item.type !== "ramen") {
-          return false;
-        }
-        if (!item.meta) {
-          return false;
-        }
-        if (typeof item.basePrice !== "number" || !Number.isFinite(item.basePrice)) {
-          return false;
-        }
-        return item.qty === 1;
-      })
-      .map((item) => item.basePrice)
-      .sort((a, b) => a - b);
+    // Expandir cada ramen según su qty y extraer basePrice
+    const ramenBasePrices = [];
+    
+    state.cart.forEach((item) => {
+      // Solo procesar items con meta (configurados como ramen)
+      if (!item.meta) return;
+      
+      // Calcular basePrice a partir de unitPrice - extras
+      let basePrice = item.unitPrice;
+      
+      if (item.meta.extras && Array.isArray(item.meta.extras)) {
+        const extrasTotal = item.meta.extras.reduce((sum, extra) => {
+          const extraUnit = typeof extra.unitPrice === "number" ? extra.unitPrice : 0;
+          const extraQty = typeof extra.qty === "number" ? extra.qty : 0;
+          return sum + (extraUnit * extraQty);
+        }, 0);
+        basePrice = item.unitPrice - extrasTotal;
+      }
+      
+      // Si ya tiene basePrice guardado, usarlo (más confiable)
+      if (typeof item.basePrice === "number" && Number.isFinite(item.basePrice)) {
+        basePrice = item.basePrice;
+      }
+      
+      // Expandir: agregar basePrice tantas veces como qty
+      const qty = typeof item.qty === "number" ? item.qty : 1;
+      for (let i = 0; i < qty; i++) {
+        ramenBasePrices.push(basePrice);
+      }
+    });
+    
+    // Ordenar de menor a mayor
+    ramenBasePrices.sort((a, b) => a - b);
+    
+    // Calcular pares y descuento
     const pairs = Math.floor(ramenBasePrices.length / 2);
-    for (let i = 0; i < pairs; i += 1) {
+    for (let i = 0; i < pairs; i++) {
       promoDiscount += ramenBasePrices[i];
     }
   }
+  
   return {
     subtotal,
     total: promoDiscount > 0 ? Math.max(0, subtotal - promoDiscount) : subtotal
