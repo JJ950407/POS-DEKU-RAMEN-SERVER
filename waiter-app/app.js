@@ -26,6 +26,8 @@ const totalEl = document.getElementById("total");
 const orderStatus = document.getElementById("orderStatus");
 const promoStatus = document.getElementById("promoStatus");
 const promoToggle = document.getElementById("promoToggle");
+const orderPrompt = document.getElementById("orderPrompt");
+const orderFlowButton = document.getElementById("orderFlowButton");
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -208,6 +210,48 @@ function getCartQty(productId) {
 function adjustCartItem(productId, delta) {
   const product = getProductById(productId);
   if (!product) return;
+
+  if (product.category === "extras") {
+    const ramenItems = state.cart.filter((entry) => entry.meta);
+    if (!ramenItems.length) {
+      return setStatus("Agrega un ramen primero.");
+    }
+    let targetRamen = ramenItems[0];
+    if (ramenItems.length > 1) {
+      const options = ramenItems.map((entry, index) => `${index + 1}. ${entry.name}`).join("\n");
+      const response = prompt(`¿A qué ramen agregar ${product.name}?\n${options}`);
+      const selection = Number(response);
+      if (!Number.isInteger(selection) || selection < 1 || selection > ramenItems.length) {
+        return;
+      }
+      targetRamen = ramenItems[selection - 1];
+    }
+    targetRamen.meta.extras = targetRamen.meta.extras || [];
+    const existingExtra = targetRamen.meta.extras.find((extra) => extra.productId === product.id);
+    let appliedDelta = 0;
+    if (existingExtra) {
+      existingExtra.qty += delta;
+      appliedDelta = delta;
+      if (existingExtra.qty <= 0) {
+        targetRamen.meta.extras = targetRamen.meta.extras.filter((extra) => extra !== existingExtra);
+      }
+    } else if (delta > 0) {
+      targetRamen.meta.extras.push({
+        productId: product.id,
+        name: product.name,
+        qty: delta,
+        unitPrice: product.price
+      });
+      appliedDelta = delta;
+    } else {
+      return;
+    }
+    const adjustment = product.price * appliedDelta;
+    targetRamen.unitPrice = Math.max(0, targetRamen.unitPrice + adjustment);
+    renderCart();
+    renderProducts();
+    return;
+  }
 
   let item = state.cart.find((entry) => entry.productId === productId && !entry.meta);
   if (!item && delta > 0) {
@@ -855,6 +899,22 @@ if (historyTable) {
 
 if (promoToggle) {
   promoToggle.addEventListener("click", togglePromoOverride);
+}
+
+if (orderFlowButton) {
+  orderFlowButton.addEventListener("click", () => {
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean bebidas o acompañamientos?";
+    }
+    state.activeCategory = "drinks";
+    renderCategories();
+    renderProducts();
+    setTimeout(() => {
+      state.activeCategory = "sides";
+      renderCategories();
+      renderProducts();
+    }, 700);
+  });
 }
 
 async function init() {
