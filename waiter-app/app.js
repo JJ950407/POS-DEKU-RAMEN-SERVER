@@ -3,6 +3,9 @@ const state = {
   activeCategory: "ramen",
   cart: [],
   promo: null,
+  note: "",
+  noteDraft: "",
+  noteEditing: false,
   wizard: {
     open: false,
     step: 0,
@@ -324,9 +327,107 @@ function renderCart() {
     cartItems.appendChild(wrapper);
   });
 
+  renderNoteSection();
+
   const totals = calculateTotals();
   subtotalEl.textContent = formatPrice(totals.subtotal);
   totalEl.textContent = formatPrice(totals.total);
+}
+
+function renderNoteSection() {
+  const hasNote = Boolean(state.note && state.note.trim());
+  if (state.cart.length === 0 && !state.noteEditing && !hasNote) {
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "cart-item note-card";
+
+  const header = document.createElement("div");
+  header.className = "note-header";
+
+  const title = document.createElement("strong");
+  title.textContent = "Nota";
+
+  const actions = document.createElement("div");
+  actions.className = "note-actions";
+
+  if (state.noteEditing) {
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "ghost note-button";
+    saveBtn.textContent = "Guardar";
+    saveBtn.addEventListener("click", () => {
+      const value = (state.noteDraft || "").trim();
+      state.note = value;
+      state.noteDraft = value;
+      state.noteEditing = false;
+      renderCart();
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "ghost note-button";
+    removeBtn.textContent = "Quitar nota";
+    removeBtn.addEventListener("click", () => {
+      state.note = "";
+      state.noteDraft = "";
+      state.noteEditing = false;
+      renderCart();
+    });
+
+    actions.append(saveBtn, removeBtn);
+  } else if (hasNote) {
+    const editBtn = document.createElement("button");
+    editBtn.className = "ghost note-button";
+    editBtn.textContent = "Editar nota";
+    editBtn.addEventListener("click", () => {
+      state.noteEditing = true;
+      state.noteDraft = state.note;
+      renderCart();
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "ghost note-button";
+    removeBtn.textContent = "Quitar nota";
+    removeBtn.addEventListener("click", () => {
+      state.note = "";
+      state.noteDraft = "";
+      renderCart();
+    });
+
+    actions.append(editBtn, removeBtn);
+  } else {
+    const addBtn = document.createElement("button");
+    addBtn.className = "ghost note-button";
+    addBtn.textContent = "Agregar nota";
+    addBtn.addEventListener("click", () => {
+      state.noteEditing = true;
+      state.noteDraft = "";
+      renderCart();
+    });
+
+    actions.appendChild(addBtn);
+  }
+
+  header.append(title, actions);
+  wrapper.appendChild(header);
+
+  if (state.noteEditing) {
+    const textarea = document.createElement("textarea");
+    textarea.className = "note-textarea";
+    textarea.placeholder = "Escribe una nota para cocina...";
+    textarea.value = state.noteDraft || "";
+    textarea.addEventListener("input", (event) => {
+      state.noteDraft = event.target.value;
+    });
+    wrapper.appendChild(textarea);
+  } else if (hasNote) {
+    const noteText = document.createElement("div");
+    noteText.className = "note-text";
+    noteText.textContent = state.note;
+    wrapper.appendChild(noteText);
+  }
+
+  cartItems.appendChild(wrapper);
 }
 
 function renderPromoStatus() {
@@ -718,6 +819,10 @@ async function sendOrder() {
     totals,
     table: tableSelect.value
   };
+  const note = state.note && state.note.trim() ? state.note.trim() : "";
+  if (note) {
+    payload.note = note;
+  }
 
   try {
     const response = await fetch(apiUrl("/api/orders"), {
@@ -731,6 +836,9 @@ async function sendOrder() {
     }
 
     state.cart = [];
+    state.note = "";
+    state.noteDraft = "";
+    state.noteEditing = false;
     if (tableSelect) {
       tableSelect.value = "";
     }

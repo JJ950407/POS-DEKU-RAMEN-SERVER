@@ -300,6 +300,12 @@ app.post("/api/orders", (req, res) => {
   const promoDiscount = calculatePromoDiscount(req.body.items);
   const promoApplied = promoPayload.promoActive && promoDiscount > 0;
   const totals = req.body.totals;
+  const noteValue = typeof req.body.note === "string"
+    ? req.body.note.trim()
+    : typeof req.body.notes === "string"
+      ? req.body.notes.trim()
+      : "";
+  const note = noteValue || null;
 
   const orders = loadOrders();
   const order = {
@@ -309,7 +315,8 @@ app.post("/api/orders", (req, res) => {
     table,
     items: req.body.items,
     totals,
-    notes: req.body.notes || ""
+    note,
+    notes: noteValue
   };
   order.promoApplied = promoApplied;
   order.promoType = "2x1_jueves";

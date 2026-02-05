@@ -275,6 +275,48 @@ body {
   background: #f5f5f5;
 }
 
+.note-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.note-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.note-button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.note-textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  font-family: inherit;
+  font-size: 14px;
+  background: #fff;
+}
+
+.note-text {
+  font-size: 14px;
+  color: #333;
+  white-space: pre-wrap;
+}
+
 .cart-item label[for="tableSelect"] {
   display: none;
 }
