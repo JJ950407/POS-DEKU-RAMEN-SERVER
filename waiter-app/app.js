@@ -2,6 +2,7 @@ const state = {
   menu: [],
   activeCategory: "ramen",
   cart: [],
+  promo: null,
   wizard: {
     open: false,
     step: 0,
@@ -23,6 +24,12 @@ const cartItems = document.getElementById("cartItems");
 const subtotalEl = document.getElementById("subtotal");
 const totalEl = document.getElementById("total");
 const orderStatus = document.getElementById("orderStatus");
+const promoStatus = document.getElementById("promoStatus");
+const promoToggle = document.getElementById("promoToggle");
+const orderPrompt = document.getElementById("orderPrompt");
+const orderFlowButton = document.getElementById("orderFlowButton");
+const orderNextButton = document.getElementById("orderNextButton");
+const sendOrderButton = document.getElementById("sendOrder");
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -46,6 +53,7 @@ const historyTable = document.getElementById("historyTable");
 
 let historyOrders = [];
 let activeHistoryOrderId = null;
+let orderFlowStep = "idle";
 
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
@@ -206,6 +214,48 @@ function adjustCartItem(productId, delta) {
   const product = getProductById(productId);
   if (!product) return;
 
+  if (product.category === "extras") {
+    const ramenItems = state.cart.filter((entry) => entry.meta);
+    if (!ramenItems.length) {
+      return setStatus("Agrega un ramen primero.");
+    }
+    let targetRamen = ramenItems[0];
+    if (ramenItems.length > 1) {
+      const options = ramenItems.map((entry, index) => `${index + 1}. ${entry.name}`).join("\n");
+      const response = prompt(`¿A qué ramen agregar ${product.name}?\n${options}`);
+      const selection = Number(response);
+      if (!Number.isInteger(selection) || selection < 1 || selection > ramenItems.length) {
+        return;
+      }
+      targetRamen = ramenItems[selection - 1];
+    }
+    targetRamen.meta.extras = targetRamen.meta.extras || [];
+    const existingExtra = targetRamen.meta.extras.find((extra) => extra.productId === product.id);
+    let appliedDelta = 0;
+    if (existingExtra) {
+      existingExtra.qty += delta;
+      appliedDelta = delta;
+      if (existingExtra.qty <= 0) {
+        targetRamen.meta.extras = targetRamen.meta.extras.filter((extra) => extra !== existingExtra);
+      }
+    } else if (delta > 0) {
+      targetRamen.meta.extras.push({
+        productId: product.id,
+        name: product.name,
+        qty: delta,
+        unitPrice: product.price
+      });
+      appliedDelta = delta;
+    } else {
+      return;
+    }
+    const adjustment = product.price * appliedDelta;
+    targetRamen.unitPrice = Math.max(0, targetRamen.unitPrice + adjustment);
+    renderCart();
+    renderProducts();
+    return;
+  }
+
   let item = state.cart.find((entry) => entry.productId === productId && !entry.meta);
   if (!item && delta > 0) {
     item = {
@@ -272,6 +322,66 @@ function renderCart() {
   const totals = calculateTotals();
   subtotalEl.textContent = formatPrice(totals.subtotal);
   totalEl.textContent = formatPrice(totals.total);
+}
+
+function renderPromoStatus() {
+  if (!promoStatus) return;
+  if (!state.promo) {
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+    if (promoToggle) {
+      promoToggle.textContent = "Activar override";
+    }
+    return;
+  }
+  if (state.promo.promoActive) {
+    const label = state.promo.promoSource === "auto_thursday"
+      ? "PROMO 2x1: ACTIVA (AUTO JUEVES)"
+      : "PROMO 2x1: ACTIVA (OVERRIDE)";
+    promoStatus.textContent = label;
+  } else {
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+  }
+  if (promoToggle) {
+    promoToggle.textContent = state.promo.manualOverrideEnabled ? "Desactivar override" : "Activar override";
+  }
+}
+
+async function fetchPromoStatus() {
+  if (!promoStatus) return;
+  try {
+    const response = await apiGet("/api/promo");
+    if (!response.ok) {
+      throw new Error("No se pudo cargar promo");
+    }
+    state.promo = await response.json();
+    renderPromoStatus();
+  } catch (error) {
+    console.error(error);
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+  }
+}
+
+async function togglePromoOverride() {
+  if (!promoToggle) return;
+  const nextEnabled = !(state.promo && state.promo.manualOverrideEnabled);
+  try {
+    const response = await fetch(apiUrl("/api/promo/override"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: nextEnabled })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      const message = data && data.error ? data.error : "No se pudo actualizar promo.";
+      alert(message);
+      return;
+    }
+    state.promo = await response.json();
+    renderPromoStatus();
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo actualizar promo.");
+  }
 }
 
 function removeCartItem(id) {
@@ -491,6 +601,10 @@ function addRamenToCart() {
 }
 
 async function sendOrder() {
+  if (orderFlowStep !== "drinks") {
+    setStatus("Completa el flujo de orden antes de enviar.");
+    return;
+  }
   if (!tableSelect || !tableSelect.value) {
     setStatus("Selecciona mesa o Para llevar.");
     return;
@@ -672,6 +786,7 @@ function renderHistoryTicket(order) {
   const statusLabel = order.status.toUpperCase();
   const cancelled = order.status === "cancelled";
   const cancelReason = order.cancelReason ? `Motivo: ${order.cancelReason}` : "";
+  const promoLine = order.promoApplied ? "<div>PROMO 2x1 JUEVES APLICADA</div>" : "";
 
   historyTicket.innerHTML = `
     <strong>DEKU RAMEN</strong>
@@ -681,6 +796,7 @@ function renderHistoryTicket(order) {
     ${cancelled && cancelReason ? `<div>${cancelReason}</div>` : ""}
     <div>${headerLine}</div>
     <div>${lines}</div>
+    ${promoLine}
     <div><strong>TOTAL:</strong> ${formatPrice(total)}</div>
   `;
 
@@ -788,6 +904,63 @@ if (historyTable) {
   historyTable.addEventListener("change", refreshHistoryView);
 }
 
+if (promoToggle) {
+  promoToggle.addEventListener("click", togglePromoOverride);
+}
+
+function updateOrderFlowUI() {
+  if (!sendOrderButton) return;
+  if (orderFlowStep === "idle") {
+    sendOrderButton.hidden = true;
+    if (orderNextButton) {
+      orderNextButton.hidden = true;
+    }
+    if (orderPrompt) {
+      orderPrompt.textContent = "";
+    }
+    return;
+  }
+  if (orderFlowStep === "sides") {
+    sendOrderButton.hidden = true;
+    if (orderNextButton) {
+      orderNextButton.hidden = false;
+    }
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean acompañamientos?";
+    }
+    return;
+  }
+  if (orderFlowStep === "drinks") {
+    sendOrderButton.hidden = false;
+    if (orderNextButton) {
+      orderNextButton.hidden = true;
+    }
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean bebidas?";
+    }
+  }
+}
+
+if (orderFlowButton) {
+  orderFlowButton.addEventListener("click", () => {
+    orderFlowStep = "sides";
+    state.activeCategory = "sides";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
+  });
+}
+
+if (orderNextButton) {
+  orderNextButton.addEventListener("click", () => {
+    orderFlowStep = "drinks";
+    state.activeCategory = "drinks";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
+  });
+}
+
 async function init() {
   try {
     const response = await apiGet("/api/menu");
@@ -801,6 +974,9 @@ async function init() {
     setStatus("No se pudo cargar menú.");
   }
 
+  fetchPromoStatus();
+  updateOrderFlowUI();
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((error) => console.error(error));
   }
@@ -808,4 +984,6 @@ async function init() {
 
 init();
 
-document.getElementById("sendOrder").addEventListener("click", sendOrder);
+if (sendOrderButton) {
+  sendOrderButton.addEventListener("click", sendOrder);
+}
