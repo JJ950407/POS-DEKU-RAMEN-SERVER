@@ -203,6 +203,46 @@ body {
   background: #f5f5f5;
 }
 
+.cart-item label[for="tableSelect"] {
+  display: none;
+}
+
+.cart-item select {
+  margin-top: 8px;
+}
+
+#tableSelect {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  appearance: none;
+}
+
+#promoToggle.promo-toggle {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid var(--secondary);
+  background: #fff;
+  color: var(--secondary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#promoToggle.promo-toggle.promo-toggle-active {
+  background: var(--secondary);
+  color: #fff;
+}
+
+.cart-item label + #tableSelect {
+  margin-top: 8px;
+}
+
 .cart-item-header {
   display: flex;
   justify-content: space-between;
