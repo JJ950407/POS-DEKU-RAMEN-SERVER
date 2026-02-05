@@ -115,6 +115,78 @@ body {
   box-shadow: 0 4px 12px var(--shadow);
 }
 
+.active-panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 4px 12px var(--shadow);
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.active-panel.hidden {
+  display: none;
+}
+
+.active-panel-title {
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+.active-panel-items {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+}
+
+.active-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.active-panel-card {
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.active-panel-action {
+  width: 100%;
+  font-size: 18px;
+  font-weight: 800;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.active-panel-action.action-pending {
+  background: #f39c12;
+  color: #fff;
+  cursor: default;
+}
+
+.active-panel-action.action-ready {
+  background: #2ecc71;
+  color: #fff;
+}
+
+.active-panel-action.action-pay {
+  background: #1d3557;
+  color: #fff;
+}
+
+.active-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .products h2 {
   font-size: 20px;
   margin-bottom: 12px;
@@ -203,6 +275,54 @@ body {
   background: #f5f5f5;
 }
 
+.cart-item label[for="tableSelect"] {
+  display: none;
+}
+
+.cart-item label[for="historyStatus"] {
+  display: none;
+}
+
+#historyStatus {
+  display: none;
+}
+
+.cart-item select {
+  margin-top: 8px;
+}
+
+#tableSelect {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  appearance: none;
+}
+
+#promoToggle.promo-toggle {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid var(--secondary);
+  background: #fff;
+  color: var(--secondary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#promoToggle.promo-toggle.promo-toggle-active {
+  background: var(--secondary);
+  color: #fff;
+}
+
+.cart-item label + #tableSelect {
+  margin-top: 8px;
+}
+
 .cart-item-header {
   display: flex;
   justify-content: space-between;
@@ -241,6 +361,11 @@ body {
   min-height: 24px;
   color: var(--secondary);
   font-weight: 600;
+}
+
+.history-toggle,
+.history-action {
+  width: 100%;
 }
 
 .modal {
