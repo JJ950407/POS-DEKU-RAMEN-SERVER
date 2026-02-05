@@ -628,15 +628,38 @@ async function sendOrder() {
     return;
   }
   const totals = calculateTotals();
-  const payload = {
-    items: state.cart.map((item) => ({
+  const items = state.cart.map((item) => {
+    if (item.meta) {
+      const extrasTotal = (item.meta && Array.isArray(item.meta.extras))
+        ? item.meta.extras.reduce((sum, extra) => {
+          const extraUnit = typeof extra.unitPrice === "number" ? extra.unitPrice : 0;
+          const extraQty = typeof extra.qty === "number" ? extra.qty : 0;
+          return sum + extraQty * extraUnit;
+        }, 0)
+        : 0;
+      const basePrice = typeof item.basePrice === "number"
+        ? item.basePrice
+        : Math.max(0, item.unitPrice - extrasTotal);
+      return {
+        productId: item.productId,
+        name: item.name,
+        qty: item.qty,
+        basePrice,
+        unitPrice: item.unitPrice,
+        meta: item.meta || {}
+      };
+    }
+    return {
       productId: item.productId,
       name: item.name,
       qty: item.qty,
       basePrice: item.basePrice,
       unitPrice: item.unitPrice,
       meta: item.meta || {}
-    })),
+    };
+  });
+  const payload = {
+    items,
     totals,
     table: tableSelect.value
   };
