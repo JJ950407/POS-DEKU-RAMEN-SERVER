@@ -856,23 +856,30 @@ function renderHistoryTicket(order) {
     const lineTotal = item.qty * item.unitPrice;
     const size = item.meta && item.meta.size ? ` ${item.meta.size}` : "";
     const spicy = item.meta && item.meta.spicy ? ` Picante ${item.meta.spicy}` : "";
-    const mainLine = `<div>${item.qty} | ${item.name}${size}${spicy} | ${formatPrice(item.unitPrice)} | ${formatPrice(lineTotal)}</div>`;
-    const extrasLines = (item.meta && item.meta.extras && item.meta.extras.length)
-      ? item.meta.extras.map((extra) => {
-        const extraUnit = typeof extra.unitPrice === "number" ? extra.unitPrice : 0;
-        const extraQty = typeof extra.qty === "number" ? extra.qty : 0;
-        const extraTotal = extraQty * extraUnit;
-        return `<div>${extraQty} | Extra: ${extra.name} | ${formatPrice(extraUnit)} | ${formatPrice(extraTotal)}</div>`;
-      }).join("")
-      : "";
-    return `${mainLine}${extrasLines}`;
+    
+    // Construir nombre con extras incluidos en UNA SOLA LÍNEA
+    let displayName = `${item.name}${size}${spicy}`;
+    
+    if (item.meta && item.meta.extras && item.meta.extras.length > 0) {
+      const extraNames = item.meta.extras.map(e => e.name).join(' + ');
+      displayName = `${displayName} + ${extraNames}`;
+    }
+    
+    const mainLine = `<div>${item.qty} | ${displayName} | ${formatPrice(item.unitPrice)} | ${formatPrice(lineTotal)}</div>`;
+    
+    return mainLine;
   }).join("");
 
   const total = calculateOrderTotal(order);
   const statusLabel = order.status.toUpperCase();
   const cancelled = order.status === "cancelled";
   const cancelReason = order.cancelReason ? `Motivo: ${order.cancelReason}` : "";
-  const promoLine = order.promoApplied ? "<div>PROMO 2x1 JUEVES APLICADA</div>" : "";
+  let promoLine = "";
+  if (order.promoApplied) {
+    const promoDiscount = order.promoDiscount || (order.totals.subtotal - order.totals.total);
+    promoLine = "<div><br>PROMO 2x1 JUEVES APLICADA</div>";
+    promoLine += `<div>Descuento (ramen más económico): -${formatPrice(promoDiscount)}</div><br>`;
+  }
 
   historyTicket.innerHTML = `
     <strong>DEKU RAMEN</strong>
