@@ -403,7 +403,7 @@ function calculateTotals() {
     
     state.cart.forEach((item) => {
       // Solo procesar items con meta (configurados como ramen)
-      if (!item.meta) return;
+      if (!item.meta || !item.meta.size) return;
       
       // Calcular basePrice a partir de unitPrice - extras
       let basePrice = item.unitPrice;
