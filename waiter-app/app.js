@@ -56,6 +56,7 @@ let activeHistoryOrderId = null;
 let orderFlowStep = 0;
 let historyViewMode = "active";
 let historyToggleButton = null;
+let activePanel = null;
 
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
@@ -150,6 +151,7 @@ function renderCategories() {
 
 function renderProducts() {
   productGrid.innerHTML = "";
+  renderActivePanel();
   const products = getMenuByCategory(state.activeCategory);
 
   products.forEach((product) => {
@@ -925,6 +927,70 @@ function renderHistoryTicket(order) {
   historyTicket.appendChild(actions);
 }
 
+function getActivePanelOrders() {
+  return historyOrders.filter((order) => ["ready", "delivered"].includes(order.status));
+}
+
+function renderActivePanel() {
+  if (!productGrid) return;
+  if (!activePanel) {
+    activePanel = document.createElement("div");
+    activePanel.className = "active-panel";
+    productGrid.parentElement.insertBefore(activePanel, productGrid);
+  }
+  const activeOrders = getActivePanelOrders();
+  if (!activeOrders.length) {
+    activePanel.innerHTML = "";
+    activePanel.classList.add("hidden");
+    return;
+  }
+  activePanel.classList.remove("hidden");
+  const cards = activeOrders.map((order) => {
+    const shortId = order.id.split("-").slice(-1)[0];
+    const statusLabel = order.status.toUpperCase();
+    const label = order.status === "ready" ? "MARCAR ENTREGADA" : "PENDIENTE DE PAGO";
+    return `
+      <div class="active-panel-card" data-order="${order.id}">
+        <div class="active-panel-header">
+          <strong>${shortId}</strong>
+          <span>${buildTableLabel(order.table)} · ${statusLabel}</span>
+        </div>
+        <button class="primary active-panel-action">${label}</button>
+      </div>
+    `;
+  }).join("");
+  activePanel.innerHTML = `
+    <div class="active-panel-title">ACTIVAS</div>
+    <div class="active-panel-list">${cards}</div>
+  `;
+  activePanel.querySelectorAll(".active-panel-card").forEach((card) => {
+    const orderId = card.dataset.order;
+    const order = activeOrders.find((item) => item.id === orderId);
+    const button = card.querySelector(".active-panel-action");
+    if (!order || !button) return;
+    if (order.status === "ready") {
+      button.addEventListener("click", () => updateHistoryStatus(order.id, "delivered"));
+    } else {
+      button.addEventListener("click", () => openHistoryForOrder(order.id));
+    }
+  });
+}
+
+async function openHistoryForOrder(orderId) {
+  historyModal.classList.remove("hidden");
+  try {
+    await fetchHistoryOrders();
+    refreshHistoryView();
+    const current = historyOrders.find((order) => order.id === orderId);
+    if (current) {
+      renderHistoryTicket(current);
+    }
+  } catch (error) {
+    console.error(error);
+    historyList.innerHTML = "<p>No se pudo cargar historial.</p>";
+  }
+}
+
 async function fetchHistoryOrders() {
   const response = await apiGet("/api/orders");
   historyOrders = await response.json();
@@ -933,6 +999,7 @@ async function fetchHistoryOrders() {
 function refreshHistoryView() {
   const filtered = getFilteredHistoryOrders();
   renderHistoryList(filtered);
+  renderActivePanel();
   if (activeHistoryOrderId) {
     const current = historyOrders.find((order) => order.id === activeHistoryOrderId);
     if (current) {
@@ -1059,6 +1126,7 @@ async function init() {
 
   fetchPromoStatus();
   updateOrderFlowUI();
+  fetchHistoryOrders().then(renderActivePanel).catch(() => {});
   if (tableSelect) {
     const placeholder = tableSelect.querySelector('option[value=""]');
     if (placeholder) {
@@ -1076,3 +1144,7 @@ init();
 if (sendOrderButton) {
   sendOrderButton.addEventListener("click", sendOrder);
 }
+
+setInterval(() => {
+  fetchHistoryOrders().then(renderActivePanel).catch(() => {});
+}, 5000);
