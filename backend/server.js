@@ -15,8 +15,49 @@ const ORDERS_PATH = path.join(DATA_DIR, "orders.json");
 const PROMO_PATH = path.join(DATA_DIR, "promo.json");
 const PROMO_TZ = "America/Mexico_City";
 const readyTimers = new Map();
+const PUBLIC_DIR = path.join(__dirname, "../public");
+const SESSION_COOKIE = "mesero_session";
+const SESSION_VALUE = "ok";
 
 app.use(express.json({ limit: "1mb" }));
+
+function parseCookies(cookieHeader) {
+  if (!cookieHeader) {
+    return {};
+  }
+  return cookieHeader.split(";").reduce((acc, part) => {
+    const [key, ...rest] = part.trim().split("=");
+    if (!key) {
+      return acc;
+    }
+    acc[key] = decodeURIComponent(rest.join("="));
+    return acc;
+  }, {});
+}
+
+function isAuthenticated(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies[SESSION_COOKIE] === SESSION_VALUE;
+}
+
+app.use("/api", (req, res, next) => {
+  if (req.path === "/login") {
+    return next();
+  }
+  if (req.path === "/menu" && req.method === "GET") {
+    return next();
+  }
+  if (req.path === "/orders" && req.method === "GET") {
+    return next();
+  }
+  if (/^\/orders\/[^/]+$/.test(req.path) && req.method === "PATCH") {
+    return next();
+  }
+  if (isAuthenticated(req)) {
+    return next();
+  }
+  return res.status(401).json({ error: "No autorizado." });
+});
 
 function safeReadJson(filePath, fallback) {
   try {
@@ -273,6 +314,20 @@ app.post("/api/promo/override", (req, res) => {
   res.json(payload);
 });
 
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body || {};
+  if (username === "Aurora" && password === "pucca123") {
+    res.cookie(SESSION_COOKIE, SESSION_VALUE, { httpOnly: true, sameSite: "lax" });
+    return res.json({ ok: true });
+  }
+  return res.status(401).json({ error: "Credenciales inválidas." });
+});
+
+app.get("/logout", (req, res) => {
+  res.clearCookie(SESSION_COOKIE);
+  res.redirect("/login");
+});
+
 app.get("/api/orders", (req, res) => {
   const { status } = req.query;
   let orders = loadOrders();
@@ -342,6 +397,32 @@ app.patch("/api/orders/:id", (req, res) => {
     return res.status(code).json({ error: result.error });
   }
   res.json(result.order);
+});
+
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "login.html"));
+});
+
+app.use(express.static(PUBLIC_DIR));
+
+app.use((req, res, next) => {
+  const pathName = req.path;
+  if (pathName.startsWith("/kitchen")) {
+    return next();
+  }
+  if (pathName.startsWith("/api")) {
+    return next();
+  }
+  if (pathName === "/login" || pathName === "/logout" || pathName === "/login.css" || pathName === "/login.js") {
+    return next();
+  }
+  if (pathName === "/assets/brand/logo.png" || pathName.startsWith("/assets/menu/")) {
+    return next();
+  }
+  if (isAuthenticated(req)) {
+    return next();
+  }
+  return res.redirect("/login");
 });
 
 app.use("/kitchen", express.static(path.join(__dirname, "../kitchen-display")));
