@@ -53,7 +53,7 @@ const historyTable = document.getElementById("historyTable");
 
 let historyOrders = [];
 let activeHistoryOrderId = null;
-let orderFlowStep = "idle";
+let orderFlowStep = 0;
 
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
@@ -250,7 +250,8 @@ function adjustCartItem(productId, delta) {
       return;
     }
     const adjustment = product.price * appliedDelta;
-    targetRamen.unitPrice = Math.max(0, targetRamen.unitPrice + adjustment);
+    const minPrice = typeof targetRamen.basePrice === "number" ? targetRamen.basePrice : 0;
+    targetRamen.unitPrice = Math.max(minPrice, targetRamen.unitPrice + adjustment);
     renderCart();
     renderProducts();
     return;
@@ -589,6 +590,7 @@ function addRamenToCart() {
     productId: ramen.base.id,
     name: ramen.base.name,
     qty: 1,
+    basePrice,
     unitPrice: basePrice + extrasTotal,
     meta: {
       size: ramen.size,
@@ -601,8 +603,20 @@ function addRamenToCart() {
 }
 
 async function sendOrder() {
-  if (orderFlowStep !== "drinks") {
-    setStatus("Completa el flujo de orden antes de enviar.");
+  if (orderFlowStep === 0) {
+    orderFlowStep = 1;
+    state.activeCategory = "sides";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
+    return;
+  }
+  if (orderFlowStep === 1) {
+    orderFlowStep = 2;
+    state.activeCategory = "drinks";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
     return;
   }
   if (!tableSelect || !tableSelect.value) {
@@ -619,6 +633,7 @@ async function sendOrder() {
       productId: item.productId,
       name: item.name,
       qty: item.qty,
+      basePrice: item.basePrice,
       unitPrice: item.unitPrice,
       meta: item.meta || {}
     })),
@@ -641,8 +656,10 @@ async function sendOrder() {
     if (tableSelect) {
       tableSelect.value = "";
     }
+    orderFlowStep = 0;
     renderCart();
     renderProducts();
+    updateOrderFlowUI();
     setStatus("Orden enviada a cocina.");
   } catch (error) {
     console.error(error);
@@ -910,55 +927,32 @@ if (promoToggle) {
 
 function updateOrderFlowUI() {
   if (!sendOrderButton) return;
-  if (orderFlowStep === "idle") {
-    sendOrderButton.hidden = true;
-    if (orderNextButton) {
-      orderNextButton.hidden = true;
-    }
+  if (orderFlowButton) {
+    orderFlowButton.style.display = "none";
+  }
+  if (orderNextButton) {
+    orderNextButton.style.display = "none";
+  }
+  if (orderFlowStep === 0) {
+    sendOrderButton.textContent = "ORDENAR";
     if (orderPrompt) {
       orderPrompt.textContent = "";
     }
     return;
   }
-  if (orderFlowStep === "sides") {
-    sendOrderButton.hidden = true;
-    if (orderNextButton) {
-      orderNextButton.hidden = false;
-    }
+  if (orderFlowStep === 1) {
+    sendOrderButton.textContent = "ORDENAR";
     if (orderPrompt) {
       orderPrompt.textContent = "¿Desean acompañamientos?";
     }
     return;
   }
-  if (orderFlowStep === "drinks") {
-    sendOrderButton.hidden = false;
-    if (orderNextButton) {
-      orderNextButton.hidden = true;
-    }
+  if (orderFlowStep === 2) {
+    sendOrderButton.textContent = "ENVIAR A COCINA";
     if (orderPrompt) {
       orderPrompt.textContent = "¿Desean bebidas?";
     }
   }
-}
-
-if (orderFlowButton) {
-  orderFlowButton.addEventListener("click", () => {
-    orderFlowStep = "sides";
-    state.activeCategory = "sides";
-    renderCategories();
-    renderProducts();
-    updateOrderFlowUI();
-  });
-}
-
-if (orderNextButton) {
-  orderNextButton.addEventListener("click", () => {
-    orderFlowStep = "drinks";
-    state.activeCategory = "drinks";
-    renderCategories();
-    renderProducts();
-    updateOrderFlowUI();
-  });
 }
 
 async function init() {
