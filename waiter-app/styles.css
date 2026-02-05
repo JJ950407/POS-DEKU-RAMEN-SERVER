@@ -207,6 +207,14 @@ body {
   display: none;
 }
 
+.cart-item label[for="historyStatus"] {
+  display: none;
+}
+
+#historyStatus {
+  display: none;
+}
+
 .cart-item select {
   margin-top: 8px;
 }
@@ -281,6 +289,11 @@ body {
   min-height: 24px;
   color: var(--secondary);
   font-weight: 600;
+}
+
+.history-toggle,
+.history-action {
+  width: 100%;
 }
 
 .modal {

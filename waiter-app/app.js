@@ -54,6 +54,8 @@ const historyTable = document.getElementById("historyTable");
 let historyOrders = [];
 let activeHistoryOrderId = null;
 let orderFlowStep = 0;
+let historyViewMode = "active";
+let historyToggleButton = null;
 
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
@@ -776,12 +778,11 @@ function buildTableLabel(value) {
 
 function getFilteredHistoryOrders() {
   let filtered = [...historyOrders];
-  const statusFilter = historyStatus ? historyStatus.value : "active";
   const tableFilter = historyTable ? historyTable.value : "";
-  if (statusFilter === "active") {
-    filtered = filtered.filter((order) => ["pending", "preparing", "ready"].includes(order.status));
-  } else if (statusFilter !== "all") {
-    filtered = filtered.filter((order) => order.status === statusFilter);
+  if (historyViewMode === "active") {
+    filtered = filtered.filter((order) => ["pending", "preparing", "ready", "delivered"].includes(order.status));
+  } else {
+    filtered = filtered.filter((order) => ["paid", "cancelled"].includes(order.status));
   }
   if (tableFilter) {
     filtered = filtered.filter((order) => order.table === tableFilter);
@@ -808,28 +809,24 @@ function renderHistoryList(orders) {
       </div>
       <small>${formatTime(order.createdAt)} · ${buildTableLabel(order.table)} · ${statusLabel}</small>
     `;
-    const actions = document.createElement("div");
-    if (order.status === "ready") {
-      const deliveredBtn = document.createElement("button");
-      deliveredBtn.className = "primary";
-      deliveredBtn.textContent = "Marcar ENTREGADA";
-      deliveredBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        updateHistoryStatus(order.id, "delivered");
-      });
-      actions.appendChild(deliveredBtn);
-    }
-    if (order.status === "delivered") {
-      const paidBtn = document.createElement("button");
-      paidBtn.className = "primary";
-      paidBtn.textContent = "Marcar PAGADA";
-      paidBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        updateHistoryStatus(order.id, "paid");
-      });
-      actions.appendChild(paidBtn);
-    }
-    if (actions.childNodes.length) {
+    if (historyViewMode === "active") {
+      const actions = document.createElement("div");
+      const actionBtn = document.createElement("button");
+      actionBtn.className = "primary history-action";
+      if (order.status === "ready") {
+        actionBtn.textContent = "MARCAR ENTREGADA";
+        actionBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          updateHistoryStatus(order.id, "delivered");
+        });
+      } else if (order.status === "delivered") {
+        actionBtn.textContent = "PENDIENTE DE PAGO";
+        actionBtn.disabled = true;
+      } else {
+        actionBtn.textContent = "EN PREPARACIÓN";
+        actionBtn.disabled = true;
+      }
+      actions.appendChild(actionBtn);
       item.appendChild(actions);
     }
     item.addEventListener("click", () => renderHistoryTicket(order));
@@ -972,6 +969,17 @@ function cancelHistoryOrder(orderId) {
 
 async function openHistoryModal() {
   historyModal.classList.remove("hidden");
+  if (historyStatus && historyStatus.parentElement && !historyToggleButton) {
+    historyToggleButton = document.createElement("button");
+    historyToggleButton.className = "primary history-toggle";
+    historyToggleButton.textContent = "ACTIVAS";
+    historyToggleButton.addEventListener("click", () => {
+      historyViewMode = historyViewMode === "active" ? "history" : "active";
+      historyToggleButton.textContent = historyViewMode === "active" ? "ACTIVAS" : "HISTORIAL";
+      refreshHistoryView();
+    });
+    historyStatus.parentElement.insertBefore(historyToggleButton, historyStatus);
+  }
   try {
     await fetchHistoryOrders();
     refreshHistoryView();
