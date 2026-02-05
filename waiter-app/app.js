@@ -174,7 +174,7 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.textContent = "Configurar";
+      button.textContent = "Ordenar";
       button.addEventListener("click", () => openWizard(product));
       card.appendChild(button);
     } else {
@@ -327,10 +327,14 @@ function renderCart() {
 
 function renderPromoStatus() {
   if (!promoStatus) return;
+  if (promoToggle) {
+    promoToggle.classList.add("promo-toggle");
+  }
   if (!state.promo) {
     promoStatus.textContent = "PROMO 2x1: INACTIVA";
     if (promoToggle) {
-      promoToggle.textContent = "Activar override";
+      promoToggle.textContent = "2x1";
+      promoToggle.classList.remove("promo-toggle-active");
     }
     return;
   }
@@ -343,7 +347,8 @@ function renderPromoStatus() {
     promoStatus.textContent = "PROMO 2x1: INACTIVA";
   }
   if (promoToggle) {
-    promoToggle.textContent = state.promo.manualOverrideEnabled ? "Desactivar override" : "Activar override";
+    promoToggle.textContent = "2x1";
+    promoToggle.classList.toggle("promo-toggle-active", state.promo.manualOverrideEnabled);
   }
 }
 
@@ -1046,6 +1051,12 @@ async function init() {
 
   fetchPromoStatus();
   updateOrderFlowUI();
+  if (tableSelect) {
+    const placeholder = tableSelect.querySelector('option[value=""]');
+    if (placeholder) {
+      placeholder.textContent = "Mesa";
+    }
+  }
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((error) => console.error(error));
