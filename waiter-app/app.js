@@ -393,9 +393,32 @@ function removeCartItem(id) {
 
 function calculateTotals() {
   const subtotal = state.cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+  const promoActive = Boolean(state.promo && state.promo.promoActive);
+  let promoDiscount = 0;
+  if (promoActive) {
+    const ramenBasePrices = state.cart
+      .filter((item) => {
+        if (item.type && item.type !== "ramen") {
+          return false;
+        }
+        if (!item.meta) {
+          return false;
+        }
+        if (typeof item.basePrice !== "number" || !Number.isFinite(item.basePrice)) {
+          return false;
+        }
+        return item.qty === 1;
+      })
+      .map((item) => item.basePrice)
+      .sort((a, b) => a - b);
+    const pairs = Math.floor(ramenBasePrices.length / 2);
+    for (let i = 0; i < pairs; i += 1) {
+      promoDiscount += ramenBasePrices[i];
+    }
+  }
   return {
     subtotal,
-    total: subtotal
+    total: promoDiscount > 0 ? Math.max(0, subtotal - promoDiscount) : subtotal
   };
 }
 
