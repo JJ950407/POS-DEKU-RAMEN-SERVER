@@ -297,20 +297,9 @@ app.post("/api/orders", (req, res) => {
   const now = new Date();
   const promoState = loadPromoState();
   const promoPayload = buildPromoPayload(promoState, now);
-  let promoDiscount = 0;
-  if (promoPayload.promoActive) {
-    promoDiscount = calculatePromoDiscount(req.body.items);
-  }
-  if (!Number.isFinite(promoDiscount) || promoDiscount <= 0) {
-    promoDiscount = 0;
-  }
-  const totals = {
-    ...req.body.totals,
-    total: promoDiscount > 0
-      ? Math.max(0, req.body.totals.total - promoDiscount)
-      : req.body.totals.total
-  };
-  const promoApplied = promoDiscount > 0;
+  const promoDiscount = calculatePromoDiscount(req.body.items);
+  const promoApplied = promoPayload.promoActive && promoDiscount > 0;
+  const totals = req.body.totals;
 
   const orders = loadOrders();
   const order = {
