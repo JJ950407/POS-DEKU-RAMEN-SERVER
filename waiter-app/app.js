@@ -33,6 +33,7 @@ const orderPrompt = document.getElementById("orderPrompt");
 const orderFlowButton = document.getElementById("orderFlowButton");
 const orderNextButton = document.getElementById("orderNextButton");
 const sendOrderButton = document.getElementById("sendOrder");
+const topBar = document.querySelector(".top-bar");
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -1246,6 +1247,17 @@ function updateOrderFlowUI() {
 }
 
 async function init() {
+  if (topBar) {
+    const actions = topBar.querySelector(".settings") || topBar;
+    const logoutButton = document.createElement("button");
+    logoutButton.type = "button";
+    logoutButton.className = "ghost logout-button";
+    logoutButton.textContent = "Cerrar sesión";
+    logoutButton.addEventListener("click", () => {
+      window.location.href = "/logout";
+    });
+    actions.appendChild(logoutButton);
+  }
   try {
     const response = await apiGet("/api/menu");
     const data = await response.json();

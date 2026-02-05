@@ -62,6 +62,14 @@ body {
   gap: 8px;
 }
 
+.logout-button {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: var(--secondary);
+}
+
 .settings input {
   padding: 8px 10px;
   border-radius: 8px;
