@@ -12,9 +12,52 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, "data");
 const MENU_PATH = path.join(DATA_DIR, "menu.json");
 const ORDERS_PATH = path.join(DATA_DIR, "orders.json");
+const PROMO_PATH = path.join(DATA_DIR, "promo.json");
+const PROMO_TZ = "America/Mexico_City";
 const readyTimers = new Map();
+const PUBLIC_DIR = path.join(__dirname, "../public");
+const SESSION_COOKIE = "mesero_session";
+const SESSION_VALUE = "ok";
 
 app.use(express.json({ limit: "1mb" }));
+
+function parseCookies(cookieHeader) {
+  if (!cookieHeader) {
+    return {};
+  }
+  return cookieHeader.split(";").reduce((acc, part) => {
+    const [key, ...rest] = part.trim().split("=");
+    if (!key) {
+      return acc;
+    }
+    acc[key] = decodeURIComponent(rest.join("="));
+    return acc;
+  }, {});
+}
+
+function isAuthenticated(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies[SESSION_COOKIE] === SESSION_VALUE;
+}
+
+app.use("/api", (req, res, next) => {
+  if (req.path === "/login") {
+    return next();
+  }
+  if (req.path === "/menu" && req.method === "GET") {
+    return next();
+  }
+  if (req.path === "/orders" && req.method === "GET") {
+    return next();
+  }
+  if (/^\/orders\/[^/]+$/.test(req.path) && req.method === "PATCH") {
+    return next();
+  }
+  if (isAuthenticated(req)) {
+    return next();
+  }
+  return res.status(401).json({ error: "No autorizado." });
+});
 
 function safeReadJson(filePath, fallback) {
   try {
@@ -44,6 +87,23 @@ function loadMenu() {
 
 function loadOrders() {
   return safeReadJson(ORDERS_PATH, []);
+}
+
+function loadPromoState() {
+  const fallback = { manualOverrideEnabled: false, updatedAt: null };
+  const data = safeReadJson(PROMO_PATH, null);
+  if (!data || typeof data.manualOverrideEnabled !== "boolean") {
+    safeWriteJson(PROMO_PATH, fallback);
+    return fallback;
+  }
+  return {
+    manualOverrideEnabled: data.manualOverrideEnabled,
+    updatedAt: data.updatedAt || null
+  };
+}
+
+function savePromoState(state) {
+  safeWriteJson(PROMO_PATH, state);
 }
 
 function saveOrders(orders) {
@@ -173,9 +233,99 @@ function validateOrderPayload(payload) {
   return null;
 }
 
+function isThursdayNow(now = new Date()) {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: PROMO_TZ, weekday: "short" }).format(now);
+  return weekday === "Thu";
+}
+
+function buildPromoPayload(promoState, now = new Date()) {
+  const isThursday = isThursdayNow(now);
+  const manualOverrideEnabled = Boolean(promoState.manualOverrideEnabled);
+  const promoActive = isThursday || manualOverrideEnabled;
+  const promoSource = promoActive ? (isThursday ? "auto_thursday" : "manual_override") : null;
+  return {
+    isThursdayNow: isThursday,
+    manualOverrideEnabled,
+    promoActive,
+    promoSource,
+    tz: PROMO_TZ,
+    nowISO: now.toISOString(),
+    promoType: "2x1_jueves"
+  };
+}
+
+function calculatePromoDiscount(items) {
+  const menu = loadMenu();
+  const menuById = new Map(menu.products.map((product) => [product.id, product]));
+  const ramenBasePrices = [];
+  items.forEach((item) => {
+    const product = menuById.get(item.productId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+    const qty = Number(item.qty);
+    const unitPrice = Number(item.unitPrice);
+    if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unitPrice)) {
+      return;
+    }
+    const extrasTotal = Array.isArray(item.meta && item.meta.extras)
+      ? item.meta.extras.reduce((sum, extra) => {
+        const extraUnit = Number(extra.unitPrice);
+        const extraQty = Number(extra.qty);
+        if (!Number.isFinite(extraUnit) || !Number.isFinite(extraQty)) {
+          return sum;
+        }
+        return sum + extraUnit * extraQty;
+      }, 0)
+      : 0;
+    const basePrice = unitPrice - extrasTotal;
+    const safeBasePrice = Number.isFinite(basePrice) ? Math.max(0, basePrice) : 0;
+    for (let i = 0; i < qty; i += 1) {
+      ramenBasePrices.push(safeBasePrice);
+    }
+  });
+  ramenBasePrices.sort((a, b) => a - b);
+  let discount = 0;
+  for (let i = 0; i + 1 < ramenBasePrices.length; i += 2) {
+    discount += ramenBasePrices[i];
+  }
+  return discount;
+}
+
 app.get("/api/menu", (req, res) => {
   const menu = loadMenu();
   res.json(menu);
+});
+
+app.get("/api/promo", (req, res) => {
+  const promoState = loadPromoState();
+  const payload = buildPromoPayload(promoState);
+  res.json(payload);
+});
+
+app.post("/api/promo/override", (req, res) => {
+  const { enabled } = req.body || {};
+  const promoState = {
+    manualOverrideEnabled: Boolean(enabled),
+    updatedAt: new Date().toISOString()
+  };
+  savePromoState(promoState);
+  const payload = buildPromoPayload(promoState);
+  res.json(payload);
+});
+
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body || {};
+  if (username === "Aurora" && password === "pucca123") {
+    res.cookie(SESSION_COOKIE, SESSION_VALUE, { httpOnly: true, sameSite: "lax" });
+    return res.json({ ok: true });
+  }
+  return res.status(401).json({ error: "Credenciales inválidas." });
+});
+
+app.get("/logout", (req, res) => {
+  res.clearCookie(SESSION_COOKIE);
+  res.redirect("/login");
 });
 
 app.get("/api/orders", (req, res) => {
@@ -199,16 +349,35 @@ app.post("/api/orders", (req, res) => {
     return res.status(400).json({ error: "Mesa inválida." });
   }
 
+  const now = new Date();
+  const promoState = loadPromoState();
+  const promoPayload = buildPromoPayload(promoState, now);
+  const promoDiscount = calculatePromoDiscount(req.body.items);
+  const promoApplied = promoPayload.promoActive && promoDiscount > 0;
+  const totals = req.body.totals;
+  const noteValue = typeof req.body.note === "string"
+    ? req.body.note.trim()
+    : typeof req.body.notes === "string"
+      ? req.body.notes.trim()
+      : "";
+  const note = noteValue || null;
+
   const orders = loadOrders();
   const order = {
     id: generateOrderId(),
-    createdAt: new Date().toISOString(),
+    createdAt: now.toISOString(),
     status: "pending",
     table,
     items: req.body.items,
-    totals: req.body.totals,
-    notes: req.body.notes || ""
+    totals,
+    note,
+    notes: noteValue
   };
+  order.promoApplied = promoApplied;
+  order.promoType = "2x1_jueves";
+  order.promoSource = promoPayload.promoActive ? promoPayload.promoSource : null;
+  order.promoDiscount = promoDiscount;
+  order.promoTimestamp = now.toISOString();
   orders.push(order);
   saveOrders(orders);
   broadcast("order:new", order);
@@ -228,6 +397,32 @@ app.patch("/api/orders/:id", (req, res) => {
     return res.status(code).json({ error: result.error });
   }
   res.json(result.order);
+});
+
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "login.html"));
+});
+
+app.use(express.static(PUBLIC_DIR));
+
+app.use((req, res, next) => {
+  const pathName = req.path;
+  if (pathName.startsWith("/kitchen")) {
+    return next();
+  }
+  if (pathName.startsWith("/api")) {
+    return next();
+  }
+  if (pathName === "/login" || pathName === "/logout" || pathName === "/login.css" || pathName === "/login.js") {
+    return next();
+  }
+  if (pathName === "/assets/brand/logo.png" || pathName.startsWith("/assets/menu/")) {
+    return next();
+  }
+  if (isAuthenticated(req)) {
+    return next();
+  }
+  return res.redirect("/login");
 });
 
 app.use("/kitchen", express.static(path.join(__dirname, "../kitchen-display")));

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deku Ramen POS · Login</title>
+  <link rel="stylesheet" href="/login.css" />
+</head>
+<body>
+  <main class="login">
+    <img src="/assets/brand/logo.png" alt="Deku Ramen" class="logo" />
+    <form id="loginForm" class="login-card">
+      <label class="field">
+        <span>Usuario</span>
+        <input id="username" type="text" autocomplete="username" required />
+      </label>
+      <label class="field">
+        <span>Contraseña</span>
+        <input id="password" type="password" autocomplete="current-password" required />
+      </label>
+      <button type="submit" class="primary">Entrar</button>
+      <p id="loginError" class="error"></p>
+    </form>
+  </main>
+  <script src="/login.js"></script>
+</body>
+</html>
