@@ -135,6 +135,12 @@ body {
   color: var(--secondary);
 }
 
+.active-panel-items {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+}
+
 .active-panel-list {
   display: flex;
   flex-direction: column;
@@ -148,6 +154,30 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.active-panel-action {
+  width: 100%;
+  font-size: 18px;
+  font-weight: 800;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.active-panel-action.action-pending {
+  background: #f39c12;
+  color: #fff;
+  cursor: default;
+}
+
+.active-panel-action.action-ready {
+  background: #2ecc71;
+  color: #fff;
+}
+
+.active-panel-action.action-pay {
+  background: #1d3557;
+  color: #fff;
 }
 
 .active-panel-header {

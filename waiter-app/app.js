@@ -928,7 +928,7 @@ function renderHistoryTicket(order) {
 }
 
 function getActivePanelOrders() {
-  return historyOrders.filter((order) => ["ready", "delivered"].includes(order.status));
+  return historyOrders.filter((order) => ["pending", "preparing", "ready", "delivered"].includes(order.status));
 }
 
 function renderActivePanel() {
@@ -936,7 +936,7 @@ function renderActivePanel() {
   if (!activePanel) {
     activePanel = document.createElement("div");
     activePanel.className = "active-panel";
-    productGrid.parentElement.insertBefore(activePanel, productGrid);
+    productGrid.insertAdjacentElement("afterend", activePanel);
   }
   const activeOrders = getActivePanelOrders();
   if (!activeOrders.length) {
@@ -948,19 +948,40 @@ function renderActivePanel() {
   const cards = activeOrders.map((order) => {
     const shortId = order.id.split("-").slice(-1)[0];
     const statusLabel = order.status.toUpperCase();
-    const label = order.status === "ready" ? "MARCAR ENTREGADA" : "PENDIENTE DE PAGO";
+    const items = order.items.map((item) => {
+      const size = item.meta && item.meta.size ? ` ${item.meta.size}` : "";
+      const spicy = item.meta && item.meta.spicy ? ` Picante ${item.meta.spicy}` : "";
+      let displayName = `${item.name}${size}${spicy}`;
+      if (item.meta && item.meta.extras && item.meta.extras.length > 0) {
+        const extraNames = item.meta.extras.map((extra) => extra.name).join(" + ");
+        displayName = `${displayName} + ${extraNames}`;
+      }
+      return `${item.qty}x ${displayName}`;
+    }).join(" · ");
+    let label = "EN PREPARACIÓN";
+    if (order.status === "ready") {
+      label = "LISTO (ENTREGAR)";
+    } else if (order.status === "delivered") {
+      label = "COBRAR";
+    }
+    const actionClass = order.status === "ready"
+      ? "action-ready"
+      : order.status === "delivered"
+        ? "action-pay"
+        : "action-pending";
     return `
       <div class="active-panel-card" data-order="${order.id}">
         <div class="active-panel-header">
-          <strong>${shortId}</strong>
-          <span>${buildTableLabel(order.table)} · ${statusLabel}</span>
+          <strong>${buildTableLabel(order.table)}</strong>
+          <span>${formatTime(order.createdAt)} · ${statusLabel} · ${shortId}</span>
         </div>
-        <button class="primary active-panel-action">${label}</button>
+        <div class="active-panel-items">${items}</div>
+        <button class="primary active-panel-action ${actionClass}">${label}</button>
       </div>
     `;
   }).join("");
   activePanel.innerHTML = `
-    <div class="active-panel-title">ACTIVAS</div>
+    <div class="active-panel-title">COMANDAS ACTIVAS</div>
     <div class="active-panel-list">${cards}</div>
   `;
   activePanel.querySelectorAll(".active-panel-card").forEach((card) => {
@@ -969,9 +990,14 @@ function renderActivePanel() {
     const button = card.querySelector(".active-panel-action");
     if (!order || !button) return;
     if (order.status === "ready") {
-      button.addEventListener("click", () => updateHistoryStatus(order.id, "delivered"));
-    } else {
+      button.addEventListener("click", async () => {
+        await updateHistoryStatus(order.id, "delivered");
+        await openHistoryForOrder(order.id);
+      });
+    } else if (order.status === "delivered") {
       button.addEventListener("click", () => openHistoryForOrder(order.id));
+    } else {
+      button.disabled = true;
     }
   });
 }
