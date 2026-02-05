@@ -2,6 +2,10 @@ const state = {
   menu: [],
   activeCategory: "ramen",
   cart: [],
+  promo: null,
+  note: "",
+  noteDraft: "",
+  noteEditing: false,
   wizard: {
     open: false,
     step: 0,
@@ -23,6 +27,12 @@ const cartItems = document.getElementById("cartItems");
 const subtotalEl = document.getElementById("subtotal");
 const totalEl = document.getElementById("total");
 const orderStatus = document.getElementById("orderStatus");
+const promoStatus = document.getElementById("promoStatus");
+const promoToggle = document.getElementById("promoToggle");
+const orderPrompt = document.getElementById("orderPrompt");
+const orderFlowButton = document.getElementById("orderFlowButton");
+const orderNextButton = document.getElementById("orderNextButton");
+const sendOrderButton = document.getElementById("sendOrder");
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -46,6 +56,10 @@ const historyTable = document.getElementById("historyTable");
 
 let historyOrders = [];
 let activeHistoryOrderId = null;
+let orderFlowStep = 0;
+let historyViewMode = "active";
+let historyToggleButton = null;
+let activePanel = null;
 
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
@@ -140,6 +154,7 @@ function renderCategories() {
 
 function renderProducts() {
   productGrid.innerHTML = "";
+  renderActivePanel();
   const products = getMenuByCategory(state.activeCategory);
 
   products.forEach((product) => {
@@ -166,7 +181,7 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.textContent = "Configurar";
+      button.textContent = "Ordenar";
       button.addEventListener("click", () => openWizard(product));
       card.appendChild(button);
     } else {
@@ -205,6 +220,49 @@ function getCartQty(productId) {
 function adjustCartItem(productId, delta) {
   const product = getProductById(productId);
   if (!product) return;
+
+  if (product.category === "extras") {
+    const ramenItems = state.cart.filter((entry) => entry.meta);
+    if (!ramenItems.length) {
+      return setStatus("Agrega un ramen primero.");
+    }
+    let targetRamen = ramenItems[0];
+    if (ramenItems.length > 1) {
+      const options = ramenItems.map((entry, index) => `${index + 1}. ${entry.name}`).join("\n");
+      const response = prompt(`¿A qué ramen agregar ${product.name}?\n${options}`);
+      const selection = Number(response);
+      if (!Number.isInteger(selection) || selection < 1 || selection > ramenItems.length) {
+        return;
+      }
+      targetRamen = ramenItems[selection - 1];
+    }
+    targetRamen.meta.extras = targetRamen.meta.extras || [];
+    const existingExtra = targetRamen.meta.extras.find((extra) => extra.productId === product.id);
+    let appliedDelta = 0;
+    if (existingExtra) {
+      existingExtra.qty += delta;
+      appliedDelta = delta;
+      if (existingExtra.qty <= 0) {
+        targetRamen.meta.extras = targetRamen.meta.extras.filter((extra) => extra !== existingExtra);
+      }
+    } else if (delta > 0) {
+      targetRamen.meta.extras.push({
+        productId: product.id,
+        name: product.name,
+        qty: delta,
+        unitPrice: product.price
+      });
+      appliedDelta = delta;
+    } else {
+      return;
+    }
+    const adjustment = product.price * appliedDelta;
+    const minPrice = typeof targetRamen.basePrice === "number" ? targetRamen.basePrice : 0;
+    targetRamen.unitPrice = Math.max(minPrice, targetRamen.unitPrice + adjustment);
+    renderCart();
+    renderProducts();
+    return;
+  }
 
   let item = state.cart.find((entry) => entry.productId === productId && !entry.meta);
   if (!item && delta > 0) {
@@ -269,9 +327,172 @@ function renderCart() {
     cartItems.appendChild(wrapper);
   });
 
+  renderNoteSection();
+
   const totals = calculateTotals();
   subtotalEl.textContent = formatPrice(totals.subtotal);
   totalEl.textContent = formatPrice(totals.total);
+}
+
+function renderNoteSection() {
+  const hasNote = Boolean(state.note && state.note.trim());
+  if (state.cart.length === 0 && !state.noteEditing && !hasNote) {
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "cart-item note-card";
+
+  const header = document.createElement("div");
+  header.className = "note-header";
+
+  const title = document.createElement("strong");
+  title.textContent = "Nota";
+
+  const actions = document.createElement("div");
+  actions.className = "note-actions";
+
+  if (state.noteEditing) {
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "ghost note-button";
+    saveBtn.textContent = "Guardar";
+    saveBtn.addEventListener("click", () => {
+      const value = (state.noteDraft || "").trim();
+      state.note = value;
+      state.noteDraft = value;
+      state.noteEditing = false;
+      renderCart();
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "ghost note-button";
+    removeBtn.textContent = "Quitar nota";
+    removeBtn.addEventListener("click", () => {
+      state.note = "";
+      state.noteDraft = "";
+      state.noteEditing = false;
+      renderCart();
+    });
+
+    actions.append(saveBtn, removeBtn);
+  } else if (hasNote) {
+    const editBtn = document.createElement("button");
+    editBtn.className = "ghost note-button";
+    editBtn.textContent = "Editar nota";
+    editBtn.addEventListener("click", () => {
+      state.noteEditing = true;
+      state.noteDraft = state.note;
+      renderCart();
+    });
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "ghost note-button";
+    removeBtn.textContent = "Quitar nota";
+    removeBtn.addEventListener("click", () => {
+      state.note = "";
+      state.noteDraft = "";
+      renderCart();
+    });
+
+    actions.append(editBtn, removeBtn);
+  } else {
+    const addBtn = document.createElement("button");
+    addBtn.className = "ghost note-button";
+    addBtn.textContent = "Agregar nota";
+    addBtn.addEventListener("click", () => {
+      state.noteEditing = true;
+      state.noteDraft = "";
+      renderCart();
+    });
+
+    actions.appendChild(addBtn);
+  }
+
+  header.append(title, actions);
+  wrapper.appendChild(header);
+
+  if (state.noteEditing) {
+    const textarea = document.createElement("textarea");
+    textarea.className = "note-textarea";
+    textarea.placeholder = "Escribe una nota para cocina...";
+    textarea.value = state.noteDraft || "";
+    textarea.addEventListener("input", (event) => {
+      state.noteDraft = event.target.value;
+    });
+    wrapper.appendChild(textarea);
+  } else if (hasNote) {
+    const noteText = document.createElement("div");
+    noteText.className = "note-text";
+    noteText.textContent = state.note;
+    wrapper.appendChild(noteText);
+  }
+
+  cartItems.appendChild(wrapper);
+}
+
+function renderPromoStatus() {
+  if (!promoStatus) return;
+  if (promoToggle) {
+    promoToggle.classList.add("promo-toggle");
+  }
+  if (!state.promo) {
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+    if (promoToggle) {
+      promoToggle.textContent = "2x1";
+      promoToggle.classList.remove("promo-toggle-active");
+    }
+    return;
+  }
+  if (state.promo.promoActive) {
+    const label = state.promo.promoSource === "auto_thursday"
+      ? "PROMO 2x1: ACTIVA (AUTO JUEVES)"
+      : "PROMO 2x1: ACTIVA (OVERRIDE)";
+    promoStatus.textContent = label;
+  } else {
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+  }
+  if (promoToggle) {
+    promoToggle.textContent = "2x1";
+    promoToggle.classList.toggle("promo-toggle-active", state.promo.manualOverrideEnabled);
+  }
+}
+
+async function fetchPromoStatus() {
+  if (!promoStatus) return;
+  try {
+    const response = await apiGet("/api/promo");
+    if (!response.ok) {
+      throw new Error("No se pudo cargar promo");
+    }
+    state.promo = await response.json();
+    renderPromoStatus();
+  } catch (error) {
+    console.error(error);
+    promoStatus.textContent = "PROMO 2x1: INACTIVA";
+  }
+}
+
+async function togglePromoOverride() {
+  if (!promoToggle) return;
+  const nextEnabled = !(state.promo && state.promo.manualOverrideEnabled);
+  try {
+    const response = await fetch(apiUrl("/api/promo/override"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: nextEnabled })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      const message = data && data.error ? data.error : "No se pudo actualizar promo.";
+      alert(message);
+      return;
+    }
+    state.promo = await response.json();
+    renderPromoStatus();
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo actualizar promo.");
+  }
 }
 
 function removeCartItem(id) {
@@ -282,9 +503,55 @@ function removeCartItem(id) {
 
 function calculateTotals() {
   const subtotal = state.cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+  
+  const promoActive = Boolean(state.promo && state.promo.promoActive);
+  let promoDiscount = 0;
+  
+  if (promoActive) {
+    // Expandir cada ramen según su qty y extraer basePrice
+    const ramenBasePrices = [];
+    
+    state.cart.forEach((item) => {
+      // Solo procesar items con meta (configurados como ramen)
+      if (!item.meta || !item.meta.size) return;
+      
+      // Calcular basePrice a partir de unitPrice - extras
+      let basePrice = item.unitPrice;
+      
+      if (item.meta.extras && Array.isArray(item.meta.extras)) {
+        const extrasTotal = item.meta.extras.reduce((sum, extra) => {
+          const extraUnit = typeof extra.unitPrice === "number" ? extra.unitPrice : 0;
+          const extraQty = typeof extra.qty === "number" ? extra.qty : 0;
+          return sum + (extraUnit * extraQty);
+        }, 0);
+        basePrice = item.unitPrice - extrasTotal;
+      }
+      
+      // Si ya tiene basePrice guardado, usarlo (más confiable)
+      if (typeof item.basePrice === "number" && Number.isFinite(item.basePrice)) {
+        basePrice = item.basePrice;
+      }
+      
+      // Expandir: agregar basePrice tantas veces como qty
+      const qty = typeof item.qty === "number" ? item.qty : 1;
+      for (let i = 0; i < qty; i++) {
+        ramenBasePrices.push(basePrice);
+      }
+    });
+    
+    // Ordenar de menor a mayor
+    ramenBasePrices.sort((a, b) => a - b);
+    
+    // Calcular pares y descuento
+    const pairs = Math.floor(ramenBasePrices.length / 2);
+    for (let i = 0; i < pairs; i++) {
+      promoDiscount += ramenBasePrices[i];
+    }
+  }
+  
   return {
     subtotal,
-    total: subtotal
+    total: promoDiscount > 0 ? Math.max(0, subtotal - promoDiscount) : subtotal
   };
 }
 
@@ -479,6 +746,7 @@ function addRamenToCart() {
     productId: ramen.base.id,
     name: ramen.base.name,
     qty: 1,
+    basePrice,
     unitPrice: basePrice + extrasTotal,
     meta: {
       size: ramen.size,
@@ -491,6 +759,22 @@ function addRamenToCart() {
 }
 
 async function sendOrder() {
+  if (orderFlowStep === 0) {
+    orderFlowStep = 1;
+    state.activeCategory = "sides";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
+    return;
+  }
+  if (orderFlowStep === 1) {
+    orderFlowStep = 2;
+    state.activeCategory = "drinks";
+    renderCategories();
+    renderProducts();
+    updateOrderFlowUI();
+    return;
+  }
   if (!tableSelect || !tableSelect.value) {
     setStatus("Selecciona mesa o Para llevar.");
     return;
@@ -500,17 +784,45 @@ async function sendOrder() {
     return;
   }
   const totals = calculateTotals();
-  const payload = {
-    items: state.cart.map((item) => ({
+  const items = state.cart.map((item) => {
+    if (item.meta) {
+      const extrasTotal = (item.meta && Array.isArray(item.meta.extras))
+        ? item.meta.extras.reduce((sum, extra) => {
+          const extraUnit = typeof extra.unitPrice === "number" ? extra.unitPrice : 0;
+          const extraQty = typeof extra.qty === "number" ? extra.qty : 0;
+          return sum + extraQty * extraUnit;
+        }, 0)
+        : 0;
+      const basePrice = typeof item.basePrice === "number"
+        ? item.basePrice
+        : Math.max(0, item.unitPrice - extrasTotal);
+      return {
+        productId: item.productId,
+        name: item.name,
+        qty: item.qty,
+        basePrice,
+        unitPrice: item.unitPrice,
+        meta: item.meta || {}
+      };
+    }
+    return {
       productId: item.productId,
       name: item.name,
       qty: item.qty,
+      basePrice: item.basePrice,
       unitPrice: item.unitPrice,
       meta: item.meta || {}
-    })),
+    };
+  });
+  const payload = {
+    items,
     totals,
     table: tableSelect.value
   };
+  const note = state.note && state.note.trim() ? state.note.trim() : "";
+  if (note) {
+    payload.note = note;
+  }
 
   try {
     const response = await fetch(apiUrl("/api/orders"), {
@@ -524,11 +836,16 @@ async function sendOrder() {
     }
 
     state.cart = [];
+    state.note = "";
+    state.noteDraft = "";
+    state.noteEditing = false;
     if (tableSelect) {
       tableSelect.value = "";
     }
+    orderFlowStep = 0;
     renderCart();
     renderProducts();
+    updateOrderFlowUI();
     setStatus("Orden enviada a cocina.");
   } catch (error) {
     console.error(error);
@@ -571,12 +888,11 @@ function buildTableLabel(value) {
 
 function getFilteredHistoryOrders() {
   let filtered = [...historyOrders];
-  const statusFilter = historyStatus ? historyStatus.value : "active";
   const tableFilter = historyTable ? historyTable.value : "";
-  if (statusFilter === "active") {
-    filtered = filtered.filter((order) => ["pending", "preparing", "ready"].includes(order.status));
-  } else if (statusFilter !== "all") {
-    filtered = filtered.filter((order) => order.status === statusFilter);
+  if (historyViewMode === "active") {
+    filtered = filtered.filter((order) => ["pending", "preparing", "ready", "delivered"].includes(order.status));
+  } else {
+    filtered = filtered.filter((order) => ["paid", "cancelled"].includes(order.status));
   }
   if (tableFilter) {
     filtered = filtered.filter((order) => order.table === tableFilter);
@@ -603,28 +919,24 @@ function renderHistoryList(orders) {
       </div>
       <small>${formatTime(order.createdAt)} · ${buildTableLabel(order.table)} · ${statusLabel}</small>
     `;
-    const actions = document.createElement("div");
-    if (order.status === "ready") {
-      const deliveredBtn = document.createElement("button");
-      deliveredBtn.className = "primary";
-      deliveredBtn.textContent = "Marcar ENTREGADA";
-      deliveredBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        updateHistoryStatus(order.id, "delivered");
-      });
-      actions.appendChild(deliveredBtn);
-    }
-    if (order.status === "delivered") {
-      const paidBtn = document.createElement("button");
-      paidBtn.className = "primary";
-      paidBtn.textContent = "Marcar PAGADA";
-      paidBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        updateHistoryStatus(order.id, "paid");
-      });
-      actions.appendChild(paidBtn);
-    }
-    if (actions.childNodes.length) {
+    if (historyViewMode === "active") {
+      const actions = document.createElement("div");
+      const actionBtn = document.createElement("button");
+      actionBtn.className = "primary history-action";
+      if (order.status === "ready") {
+        actionBtn.textContent = "MARCAR ENTREGADA";
+        actionBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          updateHistoryStatus(order.id, "delivered");
+        });
+      } else if (order.status === "delivered") {
+        actionBtn.textContent = "PENDIENTE DE PAGO";
+        actionBtn.disabled = true;
+      } else {
+        actionBtn.textContent = "EN PREPARACIÓN";
+        actionBtn.disabled = true;
+      }
+      actions.appendChild(actionBtn);
       item.appendChild(actions);
     }
     item.addEventListener("click", () => renderHistoryTicket(order));
@@ -656,22 +968,30 @@ function renderHistoryTicket(order) {
     const lineTotal = item.qty * item.unitPrice;
     const size = item.meta && item.meta.size ? ` ${item.meta.size}` : "";
     const spicy = item.meta && item.meta.spicy ? ` Picante ${item.meta.spicy}` : "";
-    const mainLine = `<div>${item.qty} | ${item.name}${size}${spicy} | ${formatPrice(item.unitPrice)} | ${formatPrice(lineTotal)}</div>`;
-    const extrasLines = (item.meta && item.meta.extras && item.meta.extras.length)
-      ? item.meta.extras.map((extra) => {
-        const extraUnit = typeof extra.unitPrice === "number" ? extra.unitPrice : 0;
-        const extraQty = typeof extra.qty === "number" ? extra.qty : 0;
-        const extraTotal = extraQty * extraUnit;
-        return `<div>${extraQty} | Extra: ${extra.name} | ${formatPrice(extraUnit)} | ${formatPrice(extraTotal)}</div>`;
-      }).join("")
-      : "";
-    return `${mainLine}${extrasLines}`;
+    
+    // Construir nombre con extras incluidos en UNA SOLA LÍNEA
+    let displayName = `${item.name}${size}${spicy}`;
+    
+    if (item.meta && item.meta.extras && item.meta.extras.length > 0) {
+      const extraNames = item.meta.extras.map(e => e.name).join(' + ');
+      displayName = `${displayName} + ${extraNames}`;
+    }
+    
+    const mainLine = `<div>${item.qty} | ${displayName} | ${formatPrice(item.unitPrice)} | ${formatPrice(lineTotal)}</div>`;
+    
+    return mainLine;
   }).join("");
 
   const total = calculateOrderTotal(order);
   const statusLabel = order.status.toUpperCase();
   const cancelled = order.status === "cancelled";
   const cancelReason = order.cancelReason ? `Motivo: ${order.cancelReason}` : "";
+  let promoLine = "";
+  if (order.promoApplied) {
+    const promoDiscount = order.promoDiscount || (order.totals.subtotal - order.totals.total);
+    promoLine = "<div><br>PROMO 2x1 JUEVES APLICADA</div>";
+    promoLine += `<div>Descuento (ramen más económico): -${formatPrice(promoDiscount)}</div><br>`;
+  }
 
   historyTicket.innerHTML = `
     <strong>DEKU RAMEN</strong>
@@ -681,6 +1001,7 @@ function renderHistoryTicket(order) {
     ${cancelled && cancelReason ? `<div>${cancelReason}</div>` : ""}
     <div>${headerLine}</div>
     <div>${lines}</div>
+    ${promoLine}
     <div><strong>TOTAL:</strong> ${formatPrice(total)}</div>
   `;
 
@@ -714,6 +1035,96 @@ function renderHistoryTicket(order) {
   historyTicket.appendChild(actions);
 }
 
+function getActivePanelOrders() {
+  return historyOrders.filter((order) => ["pending", "preparing", "ready", "delivered"].includes(order.status));
+}
+
+function renderActivePanel() {
+  if (!productGrid) return;
+  if (!activePanel) {
+    activePanel = document.createElement("div");
+    activePanel.className = "active-panel";
+    productGrid.insertAdjacentElement("afterend", activePanel);
+  }
+  const activeOrders = getActivePanelOrders();
+  if (!activeOrders.length) {
+    activePanel.innerHTML = "";
+    activePanel.classList.add("hidden");
+    return;
+  }
+  activePanel.classList.remove("hidden");
+  const cards = activeOrders.map((order) => {
+    const shortId = order.id.split("-").slice(-1)[0];
+    const statusLabel = order.status.toUpperCase();
+    const items = order.items.map((item) => {
+      const size = item.meta && item.meta.size ? ` ${item.meta.size}` : "";
+      const spicy = item.meta && item.meta.spicy ? ` Picante ${item.meta.spicy}` : "";
+      let displayName = `${item.name}${size}${spicy}`;
+      if (item.meta && item.meta.extras && item.meta.extras.length > 0) {
+        const extraNames = item.meta.extras.map((extra) => extra.name).join(" + ");
+        displayName = `${displayName} + ${extraNames}`;
+      }
+      return `${item.qty}x ${displayName}`;
+    }).join(" · ");
+    let label = "EN PREPARACIÓN";
+    if (order.status === "ready") {
+      label = "LISTO (ENTREGAR)";
+    } else if (order.status === "delivered") {
+      label = "COBRAR";
+    }
+    const actionClass = order.status === "ready"
+      ? "action-ready"
+      : order.status === "delivered"
+        ? "action-pay"
+        : "action-pending";
+    return `
+      <div class="active-panel-card" data-order="${order.id}">
+        <div class="active-panel-header">
+          <strong>${buildTableLabel(order.table)}</strong>
+          <span>${formatTime(order.createdAt)} · ${statusLabel} · ${shortId}</span>
+        </div>
+        <div class="active-panel-items">${items}</div>
+        <button class="primary active-panel-action ${actionClass}">${label}</button>
+      </div>
+    `;
+  }).join("");
+  activePanel.innerHTML = `
+    <div class="active-panel-title">COMANDAS ACTIVAS</div>
+    <div class="active-panel-list">${cards}</div>
+  `;
+  activePanel.querySelectorAll(".active-panel-card").forEach((card) => {
+    const orderId = card.dataset.order;
+    const order = activeOrders.find((item) => item.id === orderId);
+    const button = card.querySelector(".active-panel-action");
+    if (!order || !button) return;
+    if (order.status === "ready") {
+      button.addEventListener("click", async () => {
+        await updateHistoryStatus(order.id, "delivered");
+        await openHistoryForOrder(order.id);
+      });
+    } else if (order.status === "delivered") {
+      button.addEventListener("click", () => openHistoryForOrder(order.id));
+    } else {
+      button.disabled = true;
+    }
+  });
+}
+
+async function openHistoryForOrder(orderId) {
+  historyModal.classList.remove("hidden");
+  try {
+    await fetchHistoryOrders();
+    refreshHistoryView();
+    const current = historyOrders.find((order) => order.id === orderId);
+    if (current) {
+      renderHistoryTicket(current);
+    }
+  } catch (error) {
+    console.error(error);
+    historyList.innerHTML = "<p>No se pudo cargar historial.</p>";
+  }
+}
+
 async function fetchHistoryOrders() {
   const response = await apiGet("/api/orders");
   historyOrders = await response.json();
@@ -722,6 +1133,7 @@ async function fetchHistoryOrders() {
 function refreshHistoryView() {
   const filtered = getFilteredHistoryOrders();
   renderHistoryList(filtered);
+  renderActivePanel();
   if (activeHistoryOrderId) {
     const current = historyOrders.find((order) => order.id === activeHistoryOrderId);
     if (current) {
@@ -758,6 +1170,17 @@ function cancelHistoryOrder(orderId) {
 
 async function openHistoryModal() {
   historyModal.classList.remove("hidden");
+  if (historyStatus && historyStatus.parentElement && !historyToggleButton) {
+    historyToggleButton = document.createElement("button");
+    historyToggleButton.className = "primary history-toggle";
+    historyToggleButton.textContent = "ACTIVAS";
+    historyToggleButton.addEventListener("click", () => {
+      historyViewMode = historyViewMode === "active" ? "history" : "active";
+      historyToggleButton.textContent = historyViewMode === "active" ? "ACTIVAS" : "HISTORIAL";
+      refreshHistoryView();
+    });
+    historyStatus.parentElement.insertBefore(historyToggleButton, historyStatus);
+  }
   try {
     await fetchHistoryOrders();
     refreshHistoryView();
@@ -788,6 +1211,40 @@ if (historyTable) {
   historyTable.addEventListener("change", refreshHistoryView);
 }
 
+if (promoToggle) {
+  promoToggle.addEventListener("click", togglePromoOverride);
+}
+
+function updateOrderFlowUI() {
+  if (!sendOrderButton) return;
+  if (orderFlowButton) {
+    orderFlowButton.style.display = "none";
+  }
+  if (orderNextButton) {
+    orderNextButton.style.display = "none";
+  }
+  if (orderFlowStep === 0) {
+    sendOrderButton.textContent = "ORDENAR";
+    if (orderPrompt) {
+      orderPrompt.textContent = "";
+    }
+    return;
+  }
+  if (orderFlowStep === 1) {
+    sendOrderButton.textContent = "ORDENAR";
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean acompañamientos?";
+    }
+    return;
+  }
+  if (orderFlowStep === 2) {
+    sendOrderButton.textContent = "ENVIAR A COCINA";
+    if (orderPrompt) {
+      orderPrompt.textContent = "¿Desean bebidas?";
+    }
+  }
+}
+
 async function init() {
   try {
     const response = await apiGet("/api/menu");
@@ -801,6 +1258,16 @@ async function init() {
     setStatus("No se pudo cargar menú.");
   }
 
+  fetchPromoStatus();
+  updateOrderFlowUI();
+  fetchHistoryOrders().then(renderActivePanel).catch(() => {});
+  if (tableSelect) {
+    const placeholder = tableSelect.querySelector('option[value=""]');
+    if (placeholder) {
+      placeholder.textContent = "Mesa";
+    }
+  }
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((error) => console.error(error));
   }
@@ -808,4 +1275,10 @@ async function init() {
 
 init();
 
-document.getElementById("sendOrder").addEventListener("click", sendOrder);
+if (sendOrderButton) {
+  sendOrderButton.addEventListener("click", sendOrder);
+}
+
+setInterval(() => {
+  fetchHistoryOrders().then(renderActivePanel).catch(() => {});
+}, 5000);
