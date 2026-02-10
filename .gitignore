@@ -6,3 +6,11 @@ assets/menu/**
 waiter-app/assets/brand/**
 waiter-app/assets/menu/**
 kitchen-display/assets/brand/**
+# Runtime data (POS)
+backend/data/orders.json
+backend/data/promo.json
+backend/data/*.backup*.json
+
+# macOS
+.DS_Store
+
