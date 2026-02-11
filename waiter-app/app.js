@@ -201,7 +201,8 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.dataset.action = "configure";
+      button.dataset.action = "configurar";
+      button.dataset.itemId = product.id;
       button.dataset.productId = product.id;
       button.textContent = "Configurar";
       button.addEventListener("click", (event) => {
@@ -230,7 +231,7 @@ function isConfigureButtonTarget(target) {
   if (!target || !target.closest) return null;
   const button = target.closest("button");
   if (!button) return null;
-  if (button.dataset && button.dataset.action === "configure") {
+  if (button.dataset && button.dataset.action === "configurar") {
     return button;
   }
   if ((button.textContent || "").trim() === "Configurar") {
@@ -275,6 +276,77 @@ function bindConfigureCompatPatch() {
       handleConfigureDelegation(event);
     }, { passive: false });
   }
+}
+
+function installIOS12ConfigurarCompatPatch() {
+  if (window.__deku_ios12_config_fix_installed) {
+    return;
+  }
+  window.__deku_ios12_config_fix_installed = true;
+
+  let lastTouchConfigAt = 0;
+
+  function findConfigureButtonFromTarget(target) {
+    let node = target;
+    let depth = 0;
+    while (node && depth < 8) {
+      if (node.nodeType === 1 && node.tagName === "BUTTON") {
+        const action = node.getAttribute("data-action");
+        if (action === "configurar") {
+          return node;
+        }
+        const className = typeof node.className === "string" ? node.className : "";
+        if (className.indexOf("js-configurar") !== -1) {
+          return node;
+        }
+        const text = (node.textContent || "").trim();
+        if (text === "Configurar") {
+          return node;
+        }
+      }
+      node = node.parentNode;
+      depth += 1;
+    }
+    return null;
+  }
+
+  function handleConfigurarTap(event) {
+    const button = findConfigureButtonFromTarget(event.target);
+    if (!button) {
+      return;
+    }
+
+    if (event.type === "click" && Date.now() - lastTouchConfigAt < 700) {
+      return;
+    }
+
+    if (event.type === "touchend") {
+      lastTouchConfigAt = Date.now();
+    }
+
+    const itemId = button.getAttribute("data-item-id")
+      || button.getAttribute("data-itemid")
+      || button.getAttribute("data-product-id")
+      || button.getAttribute("data-productid")
+      || button.getAttribute("data-id")
+      || button.getAttribute("data-sku");
+
+    if (!itemId) {
+      return;
+    }
+
+    const product = getProductById(itemId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    openWizard(product);
+  }
+
+  document.addEventListener("touchend", handleConfigurarTap, true);
+  document.addEventListener("click", handleConfigurarTap, true);
 }
 
 function buildQtyControl(productId, qty) {
@@ -1354,6 +1426,7 @@ async function init() {
   }
 
   bindConfigureCompatPatch();
+  installIOS12ConfigurarCompatPatch();
 
   fetchPromoStatus();
   updateOrderFlowUI();
