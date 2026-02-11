@@ -182,8 +182,11 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.textContent = "Ordenar";
-      button.addEventListener("click", () => openWizard(product));
+      button.textContent = "Configurar";
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openWizard(product);
+      });
       card.appendChild(button);
     } else {
       const qtyControl = buildQtyControl(product.id, getCartQty(product.id));

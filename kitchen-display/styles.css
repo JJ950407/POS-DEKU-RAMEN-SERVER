@@ -14,15 +14,23 @@
   padding: 0;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
+  display: flex;
+  flex-direction: column;
 }
 
 .top-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex: 0 0 auto;
   padding: 16px 24px;
   background: #0f172a;
   border-bottom: 1px solid #1f2937;
@@ -35,10 +43,16 @@ body {
 }
 
 .logo {
-  height: clamp(32px, 3vw, 36px);
+  max-height: 36px;
   width: auto;
   object-fit: contain;
   filter: brightness(0.95);
+}
+
+main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .orders {
@@ -46,6 +60,8 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
   padding: 16px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .order-card {
