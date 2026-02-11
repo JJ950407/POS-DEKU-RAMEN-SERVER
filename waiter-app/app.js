@@ -511,6 +511,136 @@ function installIOS12ConfigurarCompatPatch() {
   document.addEventListener("click", handleConfigurarTap, true);
 }
 
+
+function isLegacyIOS12() {
+  const ua = navigator.userAgent || "";
+  const isiOS = /iPad|iPhone|iPod/.test(ua);
+  const isIOS12 = /OS 12_/.test(ua);
+  return isiOS && isIOS12;
+}
+
+function isConfigureButtonTarget(target) {
+  if (!target || !target.closest) return null;
+  const button = target.closest("button");
+  if (!button) return null;
+  if (button.dataset && button.dataset.action === "configurar") {
+    return button;
+  }
+  if ((button.textContent || "").trim() === "Configurar") {
+    return button;
+  }
+  return null;
+}
+
+function handleConfigureDelegation(event) {
+  const button = isConfigureButtonTarget(event.target);
+  if (!button) return;
+
+  const productId = (button.dataset && button.dataset.productId)
+    || (button.closest(".product-card") && button.closest(".product-card").dataset
+      ? button.closest(".product-card").dataset.productId
+      : null);
+
+  if (!productId) return;
+
+  const product = getProductById(productId);
+  if (!product || product.category !== "ramen") return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  openWizard(product);
+}
+
+let lastConfigureTouchAt = 0;
+
+function bindConfigureCompatPatch() {
+  if (!productGrid) return;
+
+  productGrid.addEventListener("click", handleConfigureDelegation);
+
+  if (isLegacyIOS12()) {
+    productGrid.addEventListener("touchend", (event) => {
+      const now = Date.now();
+      if (now - lastConfigureTouchAt <= 350) {
+        return;
+      }
+      lastConfigureTouchAt = now;
+      handleConfigureDelegation(event);
+    }, { passive: false });
+  }
+}
+
+function installIOS12ConfigurarCompatPatch() {
+  if (window.__deku_ios12_config_fix_installed) {
+    return;
+  }
+  window.__deku_ios12_config_fix_installed = true;
+
+  let lastTouchConfigAt = 0;
+
+  function findConfigureButtonFromTarget(target) {
+    let node = target;
+    let depth = 0;
+    while (node && depth < 8) {
+      if (node.nodeType === 1 && node.tagName === "BUTTON") {
+        const action = node.getAttribute("data-action");
+        if (action === "configurar") {
+          return node;
+        }
+        const className = typeof node.className === "string" ? node.className : "";
+        if (className.indexOf("js-configurar") !== -1) {
+          return node;
+        }
+        const text = (node.textContent || "").trim();
+        if (text === "Configurar") {
+          return node;
+        }
+      }
+      node = node.parentNode;
+      depth += 1;
+    }
+    return null;
+  }
+
+  function handleConfigurarTap(event) {
+    const button = findConfigureButtonFromTarget(event.target);
+    if (!button) {
+      return;
+    }
+
+    if (event.type === "click" && Date.now() - lastTouchConfigAt < 700) {
+      return;
+    }
+
+    if (event.type === "touchend") {
+      lastTouchConfigAt = Date.now();
+    }
+
+    const itemId = button.getAttribute("data-item-id")
+      || button.getAttribute("data-itemid")
+      || button.getAttribute("data-product-id")
+      || button.getAttribute("data-productid")
+      || button.getAttribute("data-id")
+      || button.getAttribute("data-sku");
+
+    if (!itemId) {
+      return;
+    }
+
+    const product = getProductById(itemId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    openWizard(product);
+  }
+
+  document.addEventListener("touchend", handleConfigurarTap, true);
+  document.addEventListener("click", handleConfigurarTap, true);
+}
+
 function buildQtyControl(productId, qty) {
   const wrapper = document.createElement("div");
   wrapper.className = "qty-control";
@@ -984,7 +1114,7 @@ function renderWizardStep() {
   }
 }
 
-wizardStep.addEventListener("click", (event) => {
+bindTap(wizardStep, (event) => {
   const sizeCard = event.target.closest(".option-card[data-size]");
   const spicyCard = event.target.closest(".option-card[data-spicy]");
 
@@ -1014,14 +1144,14 @@ wizardStep.addEventListener("click", (event) => {
   }
 });
 
-wizardBack.addEventListener("click", () => {
+bindTap(wizardBack, () => {
   if (state.wizard.step > 0) {
     state.wizard.step -= 1;
     renderWizardStep();
   }
 });
 
-wizardNext.addEventListener("click", () => {
+bindTap(wizardNext, () => {
   const { step, ramen } = state.wizard;
 
   if (step === 0 && !ramen.size) {
@@ -1042,7 +1172,7 @@ wizardNext.addEventListener("click", () => {
   closeWizardModal();
 });
 
-closeWizard.addEventListener("click", closeWizardModal);
+bindTap(closeWizard, closeWizardModal);
 
 function addRamenToCart() {
   const ramen = state.wizard.ramen;
