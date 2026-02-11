@@ -179,6 +179,7 @@ function renderProducts() {
   products.forEach((product) => {
     const card = document.createElement("div");
     card.className = "product-card";
+    card.dataset.productId = product.id;
 
     const image = document.createElement("img");
     image.src = assetUrl(`/assets/menu/${product.image}`);
@@ -200,6 +201,8 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
+      button.dataset.action = "configure";
+      button.dataset.productId = product.id;
       button.textContent = "Configurar";
       button.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -213,6 +216,65 @@ function renderProducts() {
 
     productGrid.appendChild(card);
   });
+}
+
+
+function isLegacyIOS12() {
+  const ua = navigator.userAgent || "";
+  const isiOS = /iPad|iPhone|iPod/.test(ua);
+  const isIOS12 = /OS 12_/.test(ua);
+  return isiOS && isIOS12;
+}
+
+function isConfigureButtonTarget(target) {
+  if (!target || !target.closest) return null;
+  const button = target.closest("button");
+  if (!button) return null;
+  if (button.dataset && button.dataset.action === "configure") {
+    return button;
+  }
+  if ((button.textContent || "").trim() === "Configurar") {
+    return button;
+  }
+  return null;
+}
+
+function handleConfigureDelegation(event) {
+  const button = isConfigureButtonTarget(event.target);
+  if (!button) return;
+
+  const productId = (button.dataset && button.dataset.productId)
+    || (button.closest(".product-card") && button.closest(".product-card").dataset
+      ? button.closest(".product-card").dataset.productId
+      : null);
+
+  if (!productId) return;
+
+  const product = getProductById(productId);
+  if (!product || product.category !== "ramen") return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  openWizard(product);
+}
+
+let lastConfigureTouchAt = 0;
+
+function bindConfigureCompatPatch() {
+  if (!productGrid) return;
+
+  productGrid.addEventListener("click", handleConfigureDelegation);
+
+  if (isLegacyIOS12()) {
+    productGrid.addEventListener("touchend", (event) => {
+      const now = Date.now();
+      if (now - lastConfigureTouchAt <= 350) {
+        return;
+      }
+      lastConfigureTouchAt = now;
+      handleConfigureDelegation(event);
+    }, { passive: false });
+  }
 }
 
 function buildQtyControl(productId, qty) {
@@ -1290,6 +1352,8 @@ async function init() {
     console.error(error);
     setStatus("No se pudo cargar menú.");
   }
+
+  bindConfigureCompatPatch();
 
   fetchPromoStatus();
   updateOrderFlowUI();
