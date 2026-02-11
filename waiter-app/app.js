@@ -62,6 +62,178 @@ let historyViewMode = "active";
 let historyToggleButton = null;
 let activePanel = null;
 
+function setupDebugHud() {
+  if (window.__dekuDbg) {
+    return;
+  }
+
+  const logBuffer = [];
+  const maxLines = 8;
+  let panel = null;
+  let content = null;
+
+  function pad2(value) {
+    return value < 10 ? "0" + value : String(value);
+  }
+
+  function nowTime() {
+    const d = new Date();
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
+
+  function renderHud() {
+    if (!content) {
+      return;
+    }
+    content.textContent = logBuffer.join("\n");
+  }
+
+  function ensureHud() {
+    if (panel) {
+      return;
+    }
+
+    panel = document.createElement("div");
+    panel.id = "dekuDebugHud";
+    panel.style.position = "fixed";
+    panel.style.left = "8px";
+    panel.style.bottom = "8px";
+    panel.style.zIndex = "99999";
+    panel.style.maxWidth = "85vw";
+    panel.style.width = "340px";
+    panel.style.background = "rgba(0,0,0,0.78)";
+    panel.style.color = "#fff";
+    panel.style.fontSize = "11px";
+    panel.style.lineHeight = "1.2";
+    panel.style.fontFamily = "monospace";
+    panel.style.borderRadius = "6px";
+    panel.style.padding = "6px";
+    panel.style.boxShadow = "0 2px 8px rgba(0,0,0,0.4)";
+
+    const head = document.createElement("div");
+    head.style.display = "flex";
+    head.style.justifyContent = "space-between";
+    head.style.alignItems = "center";
+    head.style.marginBottom = "4px";
+
+    const title = document.createElement("div");
+    title.textContent = "DEKU DBG";
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "X";
+    close.style.border = "1px solid #888";
+    close.style.background = "#222";
+    close.style.color = "#fff";
+    close.style.fontSize = "10px";
+    close.style.padding = "1px 4px";
+    close.style.borderRadius = "3px";
+    close.style.cursor = "pointer";
+    close.addEventListener("click", function () {
+      panel.style.display = "none";
+    });
+
+    content = document.createElement("pre");
+    content.style.margin = "0";
+    content.style.whiteSpace = "pre-wrap";
+    content.style.wordBreak = "break-word";
+
+    head.appendChild(title);
+    head.appendChild(close);
+    panel.appendChild(head);
+    panel.appendChild(content);
+
+    if (document.body) {
+      document.body.appendChild(panel);
+    }
+  }
+
+  window.__dekuDbg = function (msg) {
+    const line = nowTime() + " " + String(msg);
+    logBuffer.push(line);
+    if (logBuffer.length > maxLines) {
+      logBuffer.shift();
+    }
+
+    if (typeof console !== "undefined" && console && typeof console.log === "function") {
+      console.log(line);
+    }
+
+    if (!panel && document.body) {
+      ensureHud();
+    }
+    renderHud();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ensureHud);
+  } else {
+    ensureHud();
+  }
+
+  window.__dekuDbg("DEBUG HUD ready");
+}
+
+function installConfigurarDebugDelegation() {
+  if (window.__deku_config_debug_delegation_installed) {
+    return;
+  }
+  window.__deku_config_debug_delegation_installed = true;
+
+  let lastTouchAt = 0;
+
+  function findConfigButton(target) {
+    let node = target;
+    let depth = 0;
+    while (node && depth < 8) {
+      if (node.nodeType === 1 && node.tagName === "BUTTON") {
+        const action = node.getAttribute("data-action");
+        const cls = typeof node.className === "string" ? node.className : "";
+        const text = (node.textContent || "").trim();
+        if (action === "configurar" || cls.indexOf("js-configurar") !== -1 || text === "Configurar") {
+          return node;
+        }
+      }
+      node = node.parentNode;
+      depth += 1;
+    }
+    return null;
+  }
+
+  function logEvent(event) {
+    if (event.type === "click" && Date.now() - lastTouchAt < 700) {
+      return;
+    }
+    if (event.type === "touchend") {
+      lastTouchAt = Date.now();
+    }
+
+    const target = event.target;
+    const tag = target && target.tagName ? target.tagName : "unknown";
+    const btn = findConfigButton(target);
+    let itemId = null;
+    if (btn) {
+      itemId = btn.getAttribute("data-item-id")
+        || btn.getAttribute("data-itemid")
+        || btn.getAttribute("data-product-id")
+        || btn.getAttribute("data-productid")
+        || btn.getAttribute("data-id")
+        || btn.getAttribute("data-sku");
+    }
+
+    if (window.__dekuDbg) {
+      window.__dekuDbg("DELEGATION event=" + event.type + " target=" + tag + " configurar=" + (btn ? "true" : "false") + " itemId=" + (itemId || "null"));
+    }
+  }
+
+  document.addEventListener("touchend", logEvent, true);
+  document.addEventListener("click", logEvent, true);
+
+  if (window.__dekuDbg) {
+    window.__dekuDbg("DELEGATION DEBUG listeners installed");
+  }
+}
+
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
 }
@@ -161,6 +333,7 @@ function renderProducts() {
   products.forEach((product) => {
     const card = document.createElement("div");
     card.className = "product-card";
+    card.dataset.productId = product.id;
 
     const image = document.createElement("img");
     image.src = assetUrl(`/assets/menu/${product.image}`);
@@ -182,8 +355,17 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.textContent = "Ordenar";
-      button.addEventListener("click", () => openWizard(product));
+      button.dataset.action = "configurar";
+      button.dataset.itemId = product.id;
+      button.dataset.productId = product.id;
+      button.textContent = "Configurar";
+      button.addEventListener("click", (event) => {
+        if (window.__dekuDbg) {
+          window.__dekuDbg("ORIGINAL HANDLER Configurar fired itemId=" + product.id);
+        }
+        event.stopPropagation();
+        openWizard(product);
+      });
       card.appendChild(button);
     } else {
       const qtyControl = buildQtyControl(product.id, getCartQty(product.id));
@@ -192,6 +374,141 @@ function renderProducts() {
 
     productGrid.appendChild(card);
   });
+
+  if (window.__dekuDbg) {
+    const configurarButtons = productGrid.querySelectorAll('button[data-action="configurar"]').length;
+    window.__dekuDbg("RENDER: configurarButtons=" + configurarButtons);
+  }
+}
+
+
+function isLegacyIOS12() {
+  const ua = navigator.userAgent || "";
+  const isiOS = /iPad|iPhone|iPod/.test(ua);
+  const isIOS12 = /OS 12_/.test(ua);
+  return isiOS && isIOS12;
+}
+
+function isConfigureButtonTarget(target) {
+  if (!target || !target.closest) return null;
+  const button = target.closest("button");
+  if (!button) return null;
+  if (button.dataset && button.dataset.action === "configurar") {
+    return button;
+  }
+  if ((button.textContent || "").trim() === "Configurar") {
+    return button;
+  }
+  return null;
+}
+
+function handleConfigureDelegation(event) {
+  const button = isConfigureButtonTarget(event.target);
+  if (!button) return;
+
+  const productId = (button.dataset && button.dataset.productId)
+    || (button.closest(".product-card") && button.closest(".product-card").dataset
+      ? button.closest(".product-card").dataset.productId
+      : null);
+
+  if (!productId) return;
+
+  const product = getProductById(productId);
+  if (!product || product.category !== "ramen") return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  openWizard(product);
+}
+
+let lastConfigureTouchAt = 0;
+
+function bindConfigureCompatPatch() {
+  if (!productGrid) return;
+
+  productGrid.addEventListener("click", handleConfigureDelegation);
+
+  if (isLegacyIOS12()) {
+    productGrid.addEventListener("touchend", (event) => {
+      const now = Date.now();
+      if (now - lastConfigureTouchAt <= 350) {
+        return;
+      }
+      lastConfigureTouchAt = now;
+      handleConfigureDelegation(event);
+    }, { passive: false });
+  }
+}
+
+function installIOS12ConfigurarCompatPatch() {
+  if (window.__deku_ios12_config_fix_installed) {
+    return;
+  }
+  window.__deku_ios12_config_fix_installed = true;
+
+  let lastTouchConfigAt = 0;
+
+  function findConfigureButtonFromTarget(target) {
+    let node = target;
+    let depth = 0;
+    while (node && depth < 8) {
+      if (node.nodeType === 1 && node.tagName === "BUTTON") {
+        const action = node.getAttribute("data-action");
+        if (action === "configurar") {
+          return node;
+        }
+        const className = typeof node.className === "string" ? node.className : "";
+        if (className.indexOf("js-configurar") !== -1) {
+          return node;
+        }
+        const text = (node.textContent || "").trim();
+        if (text === "Configurar") {
+          return node;
+        }
+      }
+      node = node.parentNode;
+      depth += 1;
+    }
+    return null;
+  }
+
+  function handleConfigurarTap(event) {
+    const button = findConfigureButtonFromTarget(event.target);
+    if (!button) {
+      return;
+    }
+
+    if (event.type === "click" && Date.now() - lastTouchConfigAt < 700) {
+      return;
+    }
+
+    if (event.type === "touchend") {
+      lastTouchConfigAt = Date.now();
+    }
+
+    const itemId = button.getAttribute("data-item-id")
+      || button.getAttribute("data-itemid")
+      || button.getAttribute("data-product-id")
+      || button.getAttribute("data-productid")
+      || button.getAttribute("data-id")
+      || button.getAttribute("data-sku");
+
+    if (!itemId) {
+      return;
+    }
+
+    const product = getProductById(itemId);
+    if (!product || product.category !== "ramen") {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    openWizard(product);
+  }
+
+  document.addEventListener("touchend", handleConfigurarTap, true);
+  document.addEventListener("click", handleConfigurarTap, true);
 }
 
 function buildQtyControl(productId, qty) {
@@ -564,6 +881,10 @@ function buildRamenDetail(meta) {
 }
 
 function openWizard(ramen) {
+  if (window.__dekuDbg) {
+    const itemId = ramen && ramen.id ? ramen.id : "null";
+    window.__dekuDbg("OPEN POPUP called with itemId=" + itemId);
+  }
   state.wizard.open = true;
   state.wizard.step = 0;
   state.wizard.ramen = {
@@ -1247,6 +1568,9 @@ function updateOrderFlowUI() {
 }
 
 async function init() {
+  setupDebugHud();
+  installConfigurarDebugDelegation();
+
   if (topBar) {
     const actions = topBar.querySelector(".settings") || topBar;
     const logoutButton = document.createElement("button");
@@ -1269,6 +1593,9 @@ async function init() {
     console.error(error);
     setStatus("No se pudo cargar menú.");
   }
+
+  bindConfigureCompatPatch();
+  installIOS12ConfigurarCompatPatch();
 
   fetchPromoStatus();
   updateOrderFlowUI();
