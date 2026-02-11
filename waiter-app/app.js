@@ -62,6 +62,24 @@ let historyViewMode = "active";
 let historyToggleButton = null;
 let activePanel = null;
 
+function bindTap(target, handler) {
+  if (!target || typeof handler !== "function") return;
+  let lastTouchAt = 0;
+
+  target.addEventListener("touchend", (event) => {
+    lastTouchAt = Date.now();
+    event.preventDefault();
+    handler(event);
+  }, { passive: false });
+
+  target.addEventListener("click", (event) => {
+    if (Date.now() - lastTouchAt < 450) {
+      return;
+    }
+    handler(event);
+  });
+}
+
 function isLocalhostHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
 }
@@ -183,7 +201,7 @@ function renderProducts() {
       const button = document.createElement("button");
       button.className = "primary";
       button.textContent = "Ordenar";
-      button.addEventListener("click", () => openWizard(product));
+      bindTap(button, () => openWizard(product));
       card.appendChild(button);
     } else {
       const qtyControl = buildQtyControl(product.id, getCartQty(product.id));
@@ -663,7 +681,7 @@ function renderWizardStep() {
   }
 }
 
-wizardStep.addEventListener("click", (event) => {
+bindTap(wizardStep, (event) => {
   const sizeCard = event.target.closest(".option-card[data-size]");
   const spicyCard = event.target.closest(".option-card[data-spicy]");
 
@@ -693,14 +711,14 @@ wizardStep.addEventListener("click", (event) => {
   }
 });
 
-wizardBack.addEventListener("click", () => {
+bindTap(wizardBack, () => {
   if (state.wizard.step > 0) {
     state.wizard.step -= 1;
     renderWizardStep();
   }
 });
 
-wizardNext.addEventListener("click", () => {
+bindTap(wizardNext, () => {
   const { step, ramen } = state.wizard;
 
   if (step === 0 && !ramen.size) {
@@ -721,7 +739,7 @@ wizardNext.addEventListener("click", () => {
   closeWizardModal();
 });
 
-closeWizard.addEventListener("click", closeWizardModal);
+bindTap(closeWizard, closeWizardModal);
 
 function addRamenToCart() {
   const ramen = state.wizard.ramen;
