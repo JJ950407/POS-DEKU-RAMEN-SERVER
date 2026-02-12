@@ -34,6 +34,7 @@ const orderFlowButton = document.getElementById("orderFlowButton");
 const orderNextButton = document.getElementById("orderNextButton");
 const sendOrderButton = document.getElementById("sendOrder");
 const topBar = document.querySelector(".top-bar");
+let lastConfigureTouchTs = 0; // iOS12 fix
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -182,8 +183,9 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.textContent = "Ordenar";
-      button.addEventListener("click", () => openWizard(product));
+      button.textContent = "Configurar";
+      button.setAttribute("data-action", "configure"); // iOS12 fix
+      button.setAttribute("data-item-id", product.id); // iOS12 fix
       card.appendChild(button);
     } else {
       const qtyControl = buildQtyControl(product.id, getCartQty(product.id));
@@ -192,6 +194,48 @@ function renderProducts() {
 
     productGrid.appendChild(card);
   });
+}
+
+function findConfigureTrigger(target) {
+  let node = target;
+  while (node && node !== productGrid) {
+    if (node.nodeType === 1 && node.getAttribute("data-action") === "configure") {
+      return node;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function openConfigureByItemId(itemId) { // iOS12 fix
+  const ramen = getProductById(itemId);
+  if (!ramen) return;
+  openWizard(ramen);
+}
+
+function handleConfigureDelegated(event) { // iOS12 fix
+  const trigger = findConfigureTrigger(event.target);
+  if (!trigger) return;
+  const itemId = trigger.getAttribute("data-item-id");
+  if (!itemId) return;
+  openConfigureByItemId(itemId);
+}
+
+if (productGrid) {
+  productGrid.addEventListener("touchend", function (event) { // iOS12 fix
+    const trigger = findConfigureTrigger(event.target);
+    if (!trigger) return;
+    lastConfigureTouchTs = Date.now();
+    event.preventDefault();
+    handleConfigureDelegated(event);
+  }, false);
+
+  productGrid.addEventListener("click", function (event) { // iOS12 fix
+    if (Date.now() - lastConfigureTouchTs < 700) {
+      return;
+    }
+    handleConfigureDelegated(event);
+  }, false);
 }
 
 function buildQtyControl(productId, qty) {
