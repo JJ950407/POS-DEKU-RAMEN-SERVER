@@ -35,8 +35,12 @@ body {
 }
 
 .logo {
-  height: clamp(32px, 3vw, 36px);
+  height: 44px;
+  max-height: 44px;
   width: auto;
+  max-width: 100%;
+  display: block;
+  flex: 0 0 auto;
   object-fit: contain;
   filter: brightness(0.95);
 }

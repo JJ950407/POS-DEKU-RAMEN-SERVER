@@ -34,164 +34,105 @@ const orderFlowButton = document.getElementById("orderFlowButton");
 const orderNextButton = document.getElementById("orderNextButton");
 const sendOrderButton = document.getElementById("sendOrder");
 const topBar = document.querySelector(".top-bar");
+// ============================================
+// Event delegation para botones "Configurar"
+// Compatible iOS 12 (iPad2) y dispositivos modernos
+// ============================================
 
-const backendInput = document.getElementById("backendInput")
-  || document.getElementById("backend")
-  || document.getElementById("backendUrl");
-const saveBackend = document.getElementById("saveBackend");
+var lastConfigureTouchTs = 0;
+var lastTouchCoords = { x: 0, y: 0 };
 
-const wizardModal = document.getElementById("ramenWizard");
-const wizardStep = document.getElementById("wizardStep");
-const wizardTitle = document.getElementById("wizardTitle");
-const wizardBack = document.getElementById("wizardBack");
-const wizardNext = document.getElementById("wizardNext");
-const closeWizard = document.getElementById("closeWizard");
-const tableSelect = document.getElementById("tableSelect");
-const openHistory = document.getElementById("openHistory");
-const historyModal = document.getElementById("historyModal");
-const closeHistory = document.getElementById("closeHistory");
-const historyList = document.getElementById("historyList");
-const historyTicket = document.getElementById("historyTicket");
-const historyStatus = document.getElementById("historyStatus");
-const historyTable = document.getElementById("historyTable");
-
-let historyOrders = [];
-let activeHistoryOrderId = null;
-let orderFlowStep = 0;
-let historyViewMode = "active";
-let historyToggleButton = null;
-let activePanel = null;
-
-function isLocalhostHost(hostname) {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0";
+function findConfigureTrigger(element) {
+  var maxDepth = 5;
+  var current = element;
+  
+  while (current && maxDepth > 0) {
+    if (current.getAttribute && current.getAttribute("data-action") === "configure") {
+      return current;
+    }
+    current = current.parentElement;
+    maxDepth--;
+  }
+  return null;
 }
 
-function normalizeBase(url) {
-  try {
-    return new URL(url).origin;
-  } catch (e) {
-    return null;
-  }
+function handleConfigureDelegated(event) {
+  const trigger = findConfigureTrigger(event.target);
+  if (!trigger) return;
+  const itemId = trigger.getAttribute("data-item-id");
+  if (!itemId) return;
+  openConfigureByItemId(itemId);
 }
 
-function computeDefaultBackend() {
-  return isLocalhostHost(window.location.hostname)
-    ? "http://localhost:3000"
-    : window.location.origin;
-}
-
-function resolveBackendBase() {
-  const stored = localStorage.getItem("backendUrl");
-  const computed = computeDefaultBackend();
-  if (!stored) {
-    localStorage.setItem("backendUrl", computed);
-    return computed;
-  }
-  const normalized = normalizeBase(stored);
-  if (!normalized) {
-    localStorage.setItem("backendUrl", computed);
-    return computed;
-  }
-  if (!isLocalhostHost(window.location.hostname)) {
-    const storedHost = new URL(normalized).hostname;
-    if (isLocalhostHost(storedHost)) {
-      localStorage.setItem("backendUrl", window.location.origin);
-      return window.location.origin;
+// iOS12 Fix: Interceptor de coordenadas cuando event.target falla
+function handleConfigureByCoordinates(x, y) {
+  var configButtons = document.querySelectorAll('[data-action="configure"]');
+  
+  for (var i = 0; i < configButtons.length; i++) {
+    var btn = configButtons[i];
+    var rect = btn.getBoundingClientRect();
+    
+    // Verificar si el touch fue dentro del botón (margen +15px para tolerancia)
+    if (x >= rect.left - 15 && x <= rect.right + 15 &&
+        y >= rect.top - 15 && y <= rect.bottom + 15) {
+      
+      var itemId = btn.getAttribute("data-item-id");
+      console.log('iOS12 coordinate fix: Configure tapped for item', itemId);
+      
+      if (itemId) {
+        openConfigureByItemId(itemId);
+        return true;
+      }
     }
   }
-  return normalized;
+  return false;
 }
 
-let BACKEND_BASE = resolveBackendBase();
-window.DEKU_CONFIG = window.DEKU_CONFIG || {};
-window.DEKU_CONFIG.baseUrl = BACKEND_BASE;
-
-function apiUrl(path) {
-  return new URL(path, BACKEND_BASE).toString();
-}
-
-function apiGet(path) {
-  return fetch(apiUrl(path));
-}
-
-function assetUrl(path) {
-  return new URL(path, BACKEND_BASE).toString();
-}
-
-function formatPrice(value) {
-  return `$${value.toFixed(0)}`;
-}
-
-function formatTime(iso) {
-  return new Date(iso).toLocaleTimeString("es-MX", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
-function getMenuByCategory(category) {
-  return state.menu.filter((item) => item.category === category);
-}
-
-function getProductById(id) {
-  return state.menu.find((item) => item.id === id);
-}
-
-function setStatus(message) {
-  orderStatus.textContent = message;
-  setTimeout(() => {
-    if (orderStatus.textContent === message) {
-      orderStatus.textContent = "";
+if (productGrid) {
+  // touchstart: guardar coordenadas iniciales
+  productGrid.addEventListener("touchstart", function (event) {
+    if (event.touches.length === 1) {
+      lastTouchCoords.x = event.touches[0].clientX;
+      lastTouchCoords.y = event.touches[0].clientY;
     }
-  }, 3000);
-}
-
-function renderCategories() {
-  categoryButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.category === state.activeCategory);
-  });
-  categoryTitle.textContent = categoryTitles[state.activeCategory];
-}
-
-function renderProducts() {
-  productGrid.innerHTML = "";
-  renderActivePanel();
-  const products = getMenuByCategory(state.activeCategory);
-
-  products.forEach((product) => {
-    const card = document.createElement("div");
-    card.className = "product-card";
-
-    const image = document.createElement("img");
-    image.src = assetUrl(`/assets/menu/${product.image}`);
-    image.alt = product.name;
-
-    const name = document.createElement("h3");
-    name.textContent = product.name;
-
-    const price = document.createElement("p");
-    price.className = "price";
-    if (product.prices) {
-      price.textContent = `M ${formatPrice(product.prices.M)} / G ${formatPrice(product.prices.G)}`;
+  }, { passive: true });
+  
+  // touchend: intentar método normal primero, fallback a coordenadas
+  productGrid.addEventListener("touchend", function (event) {
+    const trigger = findConfigureTrigger(event.target);
+    
+    if (trigger) {
+      // Método normal funcionó (dispositivos modernos)
+      lastConfigureTouchTs = Date.now();
+      event.preventDefault();
+      handleConfigureDelegated(event);
     } else {
-      price.textContent = formatPrice(product.price || 0);
+      // iOS12 Fix: event.target no es confiable, usar coordenadas
+      var touch = event.changedTouches[0];
+      var x = touch.clientX;
+      var y = touch.clientY;
+      
+      // Verificar que no fue scroll (coordenadas muy diferentes)
+      var deltaX = Math.abs(x - lastTouchCoords.x);
+      var deltaY = Math.abs(y - lastTouchCoords.y);
+      
+      if (deltaX < 10 && deltaY < 10) {
+        // Fue tap, no scroll
+        if (handleConfigureByCoordinates(x, y)) {
+          lastConfigureTouchTs = Date.now();
+          event.preventDefault();
+        }
+      }
     }
-
-    card.append(image, name, price);
-
-    if (product.category === "ramen") {
-      const button = document.createElement("button");
-      button.className = "primary";
-      button.textContent = "Ordenar";
-      button.addEventListener("click", () => openWizard(product));
-      card.appendChild(button);
-    } else {
-      const qtyControl = buildQtyControl(product.id, getCartQty(product.id));
-      card.appendChild(qtyControl);
+  }, false);
+  
+  // click: fallback para desktop y dispositivos sin touch
+  productGrid.addEventListener("click", function (event) {
+    if (Date.now() - lastConfigureTouchTs < 700) {
+      return; // Ya fue manejado por touchend
     }
-
-    productGrid.appendChild(card);
-  });
+    handleConfigureDelegated(event);
+  }, false);
 }
 
 function buildQtyControl(productId, qty) {
@@ -1216,6 +1157,77 @@ if (promoToggle) {
   promoToggle.addEventListener("click", togglePromoOverride);
 }
 
+
+function initIOS12TouchInterceptor() {
+  // iOS12 fix: Touch Interceptor Universal
+  var menuContainer = document.getElementById("menu-grid")
+    || document.querySelector(".menu-container")
+    || productGrid;
+  if (!menuContainer) {
+    console.warn("Menu container not found for iOS12 fix");
+    return;
+  }
+
+  var touchStartY = 0;
+  var touchStartX = 0;
+  var isTap = false;
+
+  function onTouchStart(e) {
+    if (!e.touches || !e.touches.length) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isTap = true;
+  }
+
+  function onTouchMove(e) {
+    if (!e.touches || !e.touches.length) return;
+    var moveX = Math.abs(e.touches[0].clientX - touchStartX);
+    var moveY = Math.abs(e.touches[0].clientY - touchStartY);
+    if (moveX > 10 || moveY > 10) {
+      isTap = false;
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (!isTap) return;
+    if (!e.changedTouches || !e.changedTouches.length) return;
+
+    var touch = e.changedTouches[0];
+    var x = touch.clientX;
+    var y = touch.clientY;
+
+    var configButtons = document.querySelectorAll('[data-action="configure"]');
+
+    for (var i = 0; i < configButtons.length; i += 1) {
+      var btn = configButtons[i];
+      var rect = btn.getBoundingClientRect();
+
+      if (x >= rect.left - 5 && x <= rect.right + 5
+          && y >= rect.top - 5 && y <= rect.bottom + 5) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var itemId = btn.getAttribute("data-item-id");
+        if (!itemId) return;
+
+        lastConfigureTouchTs = Date.now();
+        openConfigureByItemId(itemId);
+        return;
+      }
+    }
+  }
+
+  var options = false;
+  try {
+    options = { passive: true };
+  } catch (error) {
+    options = false;
+  }
+
+  menuContainer.addEventListener("touchstart", onTouchStart, options);
+  menuContainer.addEventListener("touchmove", onTouchMove, options);
+  menuContainer.addEventListener("touchend", onTouchEnd, false);
+}
 function updateOrderFlowUI() {
   if (!sendOrderButton) return;
   if (orderFlowButton) {
@@ -1272,6 +1284,7 @@ async function init() {
 
   fetchPromoStatus();
   updateOrderFlowUI();
+  initIOS12TouchInterceptor(); // iOS12 fix
   fetchHistoryOrders().then(renderActivePanel).catch(() => {});
   if (tableSelect) {
     const placeholder = tableSelect.querySelector('option[value=""]');
