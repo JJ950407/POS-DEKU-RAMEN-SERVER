@@ -135,6 +135,48 @@ if (productGrid) {
   }, false);
 }
 
+function findConfigureTrigger(target) {
+  let node = target;
+  while (node && node !== productGrid) {
+    if (node.nodeType === 1 && node.getAttribute("data-action") === "configure") {
+      return node;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function openConfigureByItemId(itemId) { // iOS12 fix
+  const ramen = getProductById(itemId);
+  if (!ramen) return;
+  openWizard(ramen);
+}
+
+function handleConfigureDelegated(event) { // iOS12 fix
+  const trigger = findConfigureTrigger(event.target);
+  if (!trigger) return;
+  const itemId = trigger.getAttribute("data-item-id");
+  if (!itemId) return;
+  openConfigureByItemId(itemId);
+}
+
+if (productGrid) {
+  productGrid.addEventListener("touchend", function (event) { // iOS12 fix
+    const trigger = findConfigureTrigger(event.target);
+    if (!trigger) return;
+    lastConfigureTouchTs = Date.now();
+    event.preventDefault();
+    handleConfigureDelegated(event);
+  }, false);
+
+  productGrid.addEventListener("click", function (event) { // iOS12 fix
+    if (Date.now() - lastConfigureTouchTs < 700) {
+      return;
+    }
+    handleConfigureDelegated(event);
+  }, false);
+}
+
 function buildQtyControl(productId, qty) {
   const wrapper = document.createElement("div");
   wrapper.className = "qty-control";
