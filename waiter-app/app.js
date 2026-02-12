@@ -34,6 +34,7 @@ const orderFlowButton = document.getElementById("orderFlowButton");
 const orderNextButton = document.getElementById("orderNextButton");
 const sendOrderButton = document.getElementById("sendOrder");
 const topBar = document.querySelector(".top-bar");
+let lastConfigureTouchTs = 0; // iOS12 fix
 
 const backendInput = document.getElementById("backendInput")
   || document.getElementById("backend")
@@ -182,8 +183,9 @@ function renderProducts() {
     if (product.category === "ramen") {
       const button = document.createElement("button");
       button.className = "primary";
-      button.textContent = "Ordenar";
-      button.addEventListener("click", () => openWizard(product));
+      button.textContent = "Configurar";
+      button.setAttribute("data-action", "configure"); // iOS12 fix
+      button.setAttribute("data-item-id", product.id); // iOS12 fix
       card.appendChild(button);
     } else {
       const qtyControl = buildQtyControl(product.id, getCartQty(product.id));
@@ -192,6 +194,48 @@ function renderProducts() {
 
     productGrid.appendChild(card);
   });
+}
+
+function findConfigureTrigger(target) {
+  let node = target;
+  while (node && node !== productGrid) {
+    if (node.nodeType === 1 && node.getAttribute("data-action") === "configure") {
+      return node;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function openConfigureByItemId(itemId) { // iOS12 fix
+  const ramen = getProductById(itemId);
+  if (!ramen) return;
+  openWizard(ramen);
+}
+
+function handleConfigureDelegated(event) { // iOS12 fix
+  const trigger = findConfigureTrigger(event.target);
+  if (!trigger) return;
+  const itemId = trigger.getAttribute("data-item-id");
+  if (!itemId) return;
+  openConfigureByItemId(itemId);
+}
+
+if (productGrid) {
+  productGrid.addEventListener("touchend", function (event) { // iOS12 fix
+    const trigger = findConfigureTrigger(event.target);
+    if (!trigger) return;
+    lastConfigureTouchTs = Date.now();
+    event.preventDefault();
+    handleConfigureDelegated(event);
+  }, false);
+
+  productGrid.addEventListener("click", function (event) { // iOS12 fix
+    if (Date.now() - lastConfigureTouchTs < 700) {
+      return;
+    }
+    handleConfigureDelegated(event);
+  }, false);
 }
 
 function buildQtyControl(productId, qty) {
@@ -1216,6 +1260,77 @@ if (promoToggle) {
   promoToggle.addEventListener("click", togglePromoOverride);
 }
 
+
+function initIOS12TouchInterceptor() {
+  // iOS12 fix: Touch Interceptor Universal
+  var menuContainer = document.getElementById("menu-grid")
+    || document.querySelector(".menu-container")
+    || productGrid;
+  if (!menuContainer) {
+    console.warn("Menu container not found for iOS12 fix");
+    return;
+  }
+
+  var touchStartY = 0;
+  var touchStartX = 0;
+  var isTap = false;
+
+  function onTouchStart(e) {
+    if (!e.touches || !e.touches.length) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isTap = true;
+  }
+
+  function onTouchMove(e) {
+    if (!e.touches || !e.touches.length) return;
+    var moveX = Math.abs(e.touches[0].clientX - touchStartX);
+    var moveY = Math.abs(e.touches[0].clientY - touchStartY);
+    if (moveX > 10 || moveY > 10) {
+      isTap = false;
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (!isTap) return;
+    if (!e.changedTouches || !e.changedTouches.length) return;
+
+    var touch = e.changedTouches[0];
+    var x = touch.clientX;
+    var y = touch.clientY;
+
+    var configButtons = document.querySelectorAll('[data-action="configure"]');
+
+    for (var i = 0; i < configButtons.length; i += 1) {
+      var btn = configButtons[i];
+      var rect = btn.getBoundingClientRect();
+
+      if (x >= rect.left - 5 && x <= rect.right + 5
+          && y >= rect.top - 5 && y <= rect.bottom + 5) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var itemId = btn.getAttribute("data-item-id");
+        if (!itemId) return;
+
+        lastConfigureTouchTs = Date.now();
+        openConfigureByItemId(itemId);
+        return;
+      }
+    }
+  }
+
+  var options = false;
+  try {
+    options = { passive: true };
+  } catch (error) {
+    options = false;
+  }
+
+  menuContainer.addEventListener("touchstart", onTouchStart, options);
+  menuContainer.addEventListener("touchmove", onTouchMove, options);
+  menuContainer.addEventListener("touchend", onTouchEnd, false);
+}
 function updateOrderFlowUI() {
   if (!sendOrderButton) return;
   if (orderFlowButton) {
@@ -1272,6 +1387,7 @@ async function init() {
 
   fetchPromoStatus();
   updateOrderFlowUI();
+  initIOS12TouchInterceptor(); // iOS12 fix
   fetchHistoryOrders().then(renderActivePanel).catch(() => {});
   if (tableSelect) {
     const placeholder = tableSelect.querySelector('option[value=""]');
